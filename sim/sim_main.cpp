@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
   lv_display_set_color_format(d, LV_COLOR_FORMAT_RGB565);
   lv_display_set_flush_cb(d, flush);
   lv_display_set_buffers(d, buf, nullptr, sizeof buf, LV_DISPLAY_RENDER_MODE_PARTIAL);
+  ui::splash(); save("boot_logo.ppm");
   ui::begin(); run(300); save("0_connecting.ppm");
   if (argc > 1 && !strcmp(argv[1], "settings")) {
     ev(UiEvType::Link, 3, 0, "XBLOOM 381"); run(500);
