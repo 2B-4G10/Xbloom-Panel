@@ -2422,6 +2422,22 @@ void handle(const UiEvent &e) {
 // ============================================================================
 namespace ui {
 
+// Boot logo, shown from power-on until the home screen is ready (src/boot_logo.c).
+static lv_obj_t *scr_splash = nullptr;
+
+void splash() {
+  scr_splash = lv_obj_create(nullptr);
+  lv_obj_set_style_bg_color(scr_splash, hex(BG), 0);
+  lv_obj_set_style_bg_opa(scr_splash, LV_OPA_COVER, 0);
+  lv_obj_t *img = lv_image_create(scr_splash);
+  lv_image_set_src(img, &boot_logo);
+  lv_obj_set_style_image_recolor(img, hex(TEXT), 0);  // the logo is an alpha map: this is its colour
+  lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
+  lv_obj_center(img);
+  lv_screen_load(scr_splash);
+  lv_refr_now(nullptr);  // draw it now; setup() is busy for a while after this
+}
+
 void begin() {
   storage::begin();
   load_lib();
@@ -2455,6 +2471,10 @@ void begin() {
   lv_timer_pause(toast_timer);
 
   lv_screen_load(scr_home);
+  if (scr_splash) {
+    lv_obj_delete(scr_splash);
+    scr_splash = nullptr;
+  }
   set_link(LinkState::Scanning, nullptr);
 }
 
