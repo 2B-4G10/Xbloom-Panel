@@ -125,6 +125,7 @@ static void confirm_update_once_healthy() {
 }
 
 static uint32_t tick_ms() { return millis(); }
+static const uint32_t BOOT_LOGO_MS = 2500;  // shortest time the boot logo is shown
 
 static bool i2c_present(uint8_t addr) {
   Wire.beginTransmission(addr);
@@ -226,6 +227,8 @@ void setup() {
   Serial.printf("\nxBloom Panel %s starting\n", FW_VERSION);
   bring_up_power_and_touch();
   bring_up_display();
+  ui::splash();  // boot logo stays up while everything below starts
+  const uint32_t splash_at = millis();
   net::begin();  // before the UI: it loads the saved settings the Settings tab shows
   cloud::begin();
   ui::begin();
@@ -234,6 +237,7 @@ void setup() {
                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+  while (millis() - splash_at < BOOT_LOGO_MS) delay(10);  // keep the logo up long enough to be seen
   Serial.println("ready");
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 namespace ui {
+void splash(); // show the boot logo (call once the display is up, before begin())
 void begin();  // build the screens
 void tick();   // call from loop(): applies Bluetooth and network events to the screen
 
