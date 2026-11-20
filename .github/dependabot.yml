@@ -1,0 +1,25 @@
+# Dependabot keeps the build tools and the GitHub Actions used by the workflows up to date.
+# Its pull requests are built by build-release.yml as a check (no release until merged).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps(actions)"
+
+  - package-ecosystem: pip
+    directory: /           # requirements-build.txt
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(build)"
+    ignore:
+      # PlatformIO 6.2+ ships an SCons the pioarduino ESP32 platform can't load
+      # ("No module named 'SCons.Tool.FortranCommon'"). Remove once the platform supports it.
+      - dependency-name: platformio
+        versions: [">=6.2"]

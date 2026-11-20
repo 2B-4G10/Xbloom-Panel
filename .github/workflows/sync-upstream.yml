@@ -1,0 +1,73 @@
+# Pulls new fixes from the original project (Mesh-one/Xbloom-panel) into this fork every day.
+# - Clean merge: pushed to main, then a new firmware build + release is started.
+# - Conflict (e.g. upstream changed the same lines as the boot logo): opens a pull request
+#   named "Upstream sync" so it can be resolved by hand. Nothing on main changes.
+# Our README is always kept (see .gitattributes).
+name: Sync with the original repo
+
+on:
+  schedule:
+    - cron: "23 3 * * *"   # daily, 03:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write        # push the merge to main
+  pull-requests: write   # open a PR when there's a conflict
+  actions: write         # start the build & release workflow
+
+env:
+  UPSTREAM: https://github.com/Mesh-one/Xbloom-panel.git
+  UPSTREAM_BRANCH: main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config merge.ours.driver true   # used by .gitattributes to keep our README
+
+          git remote add upstream "$UPSTREAM"
+          git fetch -q upstream "$UPSTREAM_BRANCH"
+
+          if git merge-base --is-ancestor "upstream/$UPSTREAM_BRANCH" HEAD; then
+            echo "✓ Already up to date with $UPSTREAM"
+            exit 0
+          fi
+          NEW=$(git rev-list --count "HEAD..upstream/$UPSTREAM_BRANCH")
+          echo "Upstream has $NEW new commit(s):"
+          git log --oneline "HEAD..upstream/$UPSTREAM_BRANCH"
+
+          if git merge --no-edit -m "Merge $NEW upstream fix(es) from Mesh-one/Xbloom-panel" "upstream/$UPSTREAM_BRANCH"; then
+            if git push origin HEAD:main; then
+              echo "✓ Merged and pushed. Starting a new firmware build + release…"
+              gh workflow run build-release.yml --ref main
+              exit 0
+            fi
+            echo "::warning::Push was refused (upstream may have changed workflow files, which the built-in token can't push). Opening a PR instead."
+          else
+            echo "::warning::Merge conflict with upstream. Opening a PR to resolve by hand."
+            git merge --abort
+          fi
+
+          BRANCH=upstream-sync
+          git push -f origin "upstream/$UPSTREAM_BRANCH:refs/heads/$BRANCH"
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --base main --head "$BRANCH" \
+              --title "Upstream sync: $NEW new commit(s) from Mesh-one/Xbloom-panel" \
+              --body "Daily sync couldn't merge these upstream commits automatically (conflict or protected files). Resolve the conflicts here and merge; a new firmware release is built automatically after merging.
+
+          $(git log --pretty='- %s (%h)' "HEAD..upstream/$UPSTREAM_BRANCH")"
+          else
+            echo "An Upstream sync PR is already open; its branch was updated."
+          fi
