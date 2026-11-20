@@ -13,6 +13,7 @@
 ![macOS](https://img.shields.io/badge/macOS-one_command-7887c8?style=for-the-badge&logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-one_command-7cc4ae?style=for-the-badge&logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-e4a3a4?style=for-the-badge)
+[![Latest release](https://img.shields.io/github/v/release/2B-4G10/Xbloom-Panel?style=for-the-badge&label=latest&color=e2dba6)](https://github.com/2B-4G10/Xbloom-Panel/releases/latest)
 
 </div>
 
@@ -117,10 +118,31 @@ Set these before the command if you need them. On a Mac, put them in front, e.g.
 
 No cable needed once the panel runs this firmware:
 
-1. Get the update file: `xbloom-panel-…-doubleshot-update.bin`. The installer puts it on your Desktop, or run it with `XBP_BUILD_ONLY=1`.
+1. Download **[`xbloom-panel-doubleshot-update.bin`](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-update.bin)** from the [latest release](https://github.com/2B-4G10/Xbloom-Panel/releases/latest).
 2. On the panel: **Settings → Software update**. Open the link it shows on your phone and upload the file.
 
-> ⚠️ The files in `firmware/` and the one-click web installer at mesh-one.github.io are the **original** builds **without** the Double Shot logo. Use the installers above to get the logo.
+Your Wi-Fi, xBloom login and recipes stay as they are. 🎈
+
+### 📦 Release files
+
+Every release has:
+
+| File | Use it for |
+|---|---|
+| [`xbloom-panel-doubleshot-update.bin`](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-update.bin) | 🛜 Wi-Fi updates from the panel's Settings |
+| [`xbloom-panel-doubleshot-full.bin`](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-full.bin) | 🔌 A fresh USB install, written at address `0x0` |
+| `SHA256SUMS.txt` | ✅ Checksums to verify your download |
+
+> ⚠️ The files in `firmware/` and the one-click web installer at mesh-one.github.io are the **original** builds **without** the Double Shot logo. Use the release files or the installers above.
+
+### 🤖 How releases stay fresh
+
+| | |
+|---|---|
+| 🏗️ **Auto-build** | Every change to the firmware on `main` is built by GitHub Actions and published as a new [release](https://github.com/2B-4G10/Xbloom-Panel/releases) with both `.bin` files. |
+| 📝 **Changelog** | Each release lists what changed since the previous one, and [`CHANGELOG.md`](CHANGELOG.md) keeps the full history. |
+| 🔄 **Original-repo fixes** | Every day the fork checks [Mesh-one/Xbloom-panel](https://github.com/Mesh-one/Xbloom-panel) for new fixes. Clean ones are merged and released automatically. If one clashes with the Double Shot changes, an **"Upstream sync"** pull request is opened to resolve by hand. |
+| 🤝 **Dependabot** | Keeps the build tools and GitHub Actions up to date. Each Dependabot pull request is test-built before you merge it. |
 
 ---
 
@@ -221,6 +243,7 @@ The boot logo is `src/boot_logo.c`, a 720×189 8-bit alpha map that the firmware
 |---|---|
 | `src/`, `include/` | Firmware source (boot logo in `src/boot_logo.c`) |
 | `scripts/` | The Mac and Windows one-command installers |
+| `.github/` | Auto build & release, daily upstream sync, Dependabot |
 | `sim/` | Desktop preview of the UI |
 | `case/` | The 3D-printable case (STL) |
 | `docs/` | Original one-click web installer page, and images for this README |

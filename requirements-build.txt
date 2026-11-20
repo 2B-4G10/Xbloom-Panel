@@ -1,0 +1,3 @@
+# Build tools for the firmware (used by CI; Dependabot keeps this file current).
+# PlatformIO 6.2+ ships an SCons the pioarduino ESP32 platform cannot load, so stay on 6.1.x.
+platformio==6.1.19

@@ -1,0 +1,2 @@
+# Keep our README when merging fixes from the original repo (see sync-upstream.yml).
+README.md merge=ours
