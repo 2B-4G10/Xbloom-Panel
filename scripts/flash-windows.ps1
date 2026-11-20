@@ -1,7 +1,7 @@
 # xBloom Panel - Double Shot edition - one-command installer for Windows 10/11.
 #
 # Checks and installs everything it needs (winget, Git, Python 3.10-3.14,
-# PlatformIO 6.1.19, esptool, the WCH USB driver), finds the panel, backs up
+# PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the panel, backs up
 # its current firmware, builds this repo and flashes it.
 #
 # Run in PowerShell:
@@ -22,7 +22,7 @@ $ProgressPreference = 'SilentlyContinue'
 $RepoUrl     = 'https://github.com/2B-4G10/Xbloom-Panel'
 $Dir         = if ($env:XBP_DIR) { $env:XBP_DIR } else { Join-Path $HOME 'Xbloom-Panel' }
 $Baud        = if ($env:XBP_BAUD) { $env:XBP_BAUD } else { '115200' }
-$PioVersion  = '6.1.19'   # newer cores ship an SCons the ESP32 platform can't use
+$PioPkg      = 'pioarduino==6.2.0.post1'   # the PlatformIO Core the ESP32 platform itself uses (see requirements-build.txt)
 $EnvName     = 'crowpanel-advance-43'
 $PioHome     = Join-Path $HOME '.platformio'
 $Penv        = Join-Path $PioHome 'penv'
@@ -89,20 +89,22 @@ if (-not $Py) {
 Ok ("Using {0} at {1}" -f (& $Py --version), $Py)
 
 # ---------------------------------------------------------------------------
-Step "PlatformIO $PioVersion"
+Step "PlatformIO ($PioPkg)"
+# The ESP32 platform runs part of the build with the PlatformIO Core in .platformio\penv,
+# so the whole build uses that same core (mixing two cores breaks the last build step).
 $PenvPy  = Join-Path $Penv 'Scripts\python.exe'
 $Pio     = Join-Path $Penv 'Scripts\pio.exe'
 if ((Test-Path $PenvPy) -and -not (Py-Ok $PenvPy)) {
   Warn 'PlatformIO uses an unsupported Python. Rebuilding its environment...'
   Remove-Item -Recurse -Force $Penv -ErrorAction Stop   # only PlatformIO's own Python environment; recreated below
 }
-if (-not (Test-Path $Pio)) {
-  $getPio = Join-Path $env:TEMP 'get-platformio.py'
-  Invoke-WebRequest 'https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py' -OutFile $getPio -UseBasicParsing -ErrorAction Stop
-  Run $Py @($getPio)
-}
-if (((& $Pio --version) -split ' ')[-1] -ne $PioVersion) {
-  Run $PenvPy @('-m','pip','install','-q',"platformio==$PioVersion")
+if (-not (Test-Path $PenvPy)) { Run $Py @('-m','venv',$Penv) }
+$want = ($PioPkg -split '==')[1]
+$have = ((& $PenvPy -m pip show pioarduino 2>$null) | Select-String '^Version:\s*(.+)$' | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() })
+if ($have -ne $want) {
+  Run $PenvPy @('-m','pip','install','-q','--upgrade','pip')
+  & $PenvPy -m pip uninstall -y -q platformio 2>$null | Out-Null   # stock core, if an older install left it
+  Run $PenvPy @('-m','pip','install','-q','--force-reinstall',$PioPkg)
 }
 Ok (& $Pio --version)
 

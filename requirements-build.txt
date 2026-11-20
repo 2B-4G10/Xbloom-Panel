@@ -1,3 +1,6 @@
-# Build tools for the firmware (used by CI; Dependabot keeps this file current).
-# PlatformIO 6.2+ ships an SCons the pioarduino ESP32 platform cannot load, so stay on 6.1.x.
-platformio==6.1.19
+# Build tool for the firmware (used by CI and the installers; Dependabot keeps it current).
+# pioarduino is the PlatformIO Core fork the pioarduino ESP32 platform installs and runs
+# for its nested build. Using it for the whole build keeps both halves on the same SCons;
+# stock platformio mixed with it fails at the end with
+# "No module named SCons.Tool.FortranCommon".
+pioarduino==6.2.0.post1
