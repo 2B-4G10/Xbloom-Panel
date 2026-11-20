@@ -13,7 +13,8 @@ LV_FONT_DECLARE(inter_96_num);
 LV_FONT_DECLARE(inter_120_bold);
 LV_FONT_DECLARE(inter_clock);
 LV_FONT_DECLARE(inter_44);
-LV_IMAGE_DECLARE(boot_logo);  // src/boot_logo.c
+LV_IMAGE_DECLARE(boot_logo);   // src/boot_logo.c
+LV_IMAGE_DECLARE(store_logo);  // src/store_logo.c
 
 namespace th {
 inline lv_color_t hex(uint32_t c) { return lv_color_hex(c); }
