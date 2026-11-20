@@ -2,7 +2,7 @@
 # xBloom Panel · Double Shot edition — one-command installer for macOS.
 #
 # Checks and installs everything it needs (Xcode command-line tools, Homebrew,
-# Python 3.10–3.14, PlatformIO 6.1.19, esptool, the WCH USB driver), finds the
+# Python 3.10–3.14, PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the
 # panel, backs up its current firmware, builds this repo and flashes it.
 #
 # Run:   bash <(curl -fsSL https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/scripts/flash-mac.sh)
@@ -18,7 +18,7 @@ set -euo pipefail
 REPO_URL="https://github.com/2B-4G10/Xbloom-Panel"
 DIR="${XBP_DIR:-$HOME/Xbloom-Panel}"
 BAUD="${XBP_BAUD:-115200}"
-PIO_VERSION="6.1.19"   # newer cores ship an SCons the ESP32 platform can't use
+PIO_PKG="pioarduino==6.2.0.post1"   # the PlatformIO Core the ESP32 platform itself uses (see requirements-build.txt)
 ENV_NAME="crowpanel-advance-43"
 PIO_HOME="$HOME/.platformio"
 PENV="$PIO_HOME/penv"
@@ -85,17 +85,20 @@ fi
 ok "Using $("$PY" --version) at $PY"
 
 # ---------------------------------------------------------------------------
-step "PlatformIO $PIO_VERSION"
+step "PlatformIO (${PIO_PKG})"
+# The ESP32 platform runs part of the build with the PlatformIO Core in ~/.platformio/penv,
+# so the whole build uses that same core (mixing two cores breaks the last build step).
 if [[ -x "$PENV/bin/python" ]] && ! py_ok "$PENV/bin/python"; then
   warn "PlatformIO's environment uses $("$PENV/bin/python" --version 2>&1). Rebuilding it with $("$PY" --version)…"
-  rm -rf "$PENV"   # only PlatformIO's own Python environment; the installer recreates it
+  rm -rf "$PENV"   # only PlatformIO's own Python environment; recreated just below
 fi
-if [[ ! -x "$PENV/bin/pio" ]]; then
-  curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -o /tmp/get-platformio.py
-  "$PY" /tmp/get-platformio.py
-fi
-if [[ "$("$PENV/bin/pio" --version 2>/dev/null | awk '{print $NF}')" != "$PIO_VERSION" ]]; then
-  "$PENV/bin/python" -m pip install -q "platformio==$PIO_VERSION"
+[[ -x "$PENV/bin/python" ]] || "$PY" -m venv "$PENV"
+want="${PIO_PKG#*==}"
+have="$("$PENV/bin/python" -m pip show pioarduino 2>/dev/null | awk '/^Version:/{print $2}' || true)"
+if [[ "$have" != "$want" ]]; then
+  "$PENV/bin/python" -m pip install -q --upgrade pip
+  "$PENV/bin/python" -m pip uninstall -y -q platformio 2>/dev/null || true   # stock core, if an older install left it
+  "$PENV/bin/python" -m pip install -q --force-reinstall "$PIO_PKG"
 fi
 PIO="$PENV/bin/pio"
 ok "$("$PIO" --version)"
