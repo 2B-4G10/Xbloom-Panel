@@ -22,7 +22,7 @@ $ProgressPreference = 'SilentlyContinue'
 $RepoUrl     = 'https://github.com/2B-4G10/Xbloom-Panel'
 $Dir         = if ($env:XBP_DIR) { $env:XBP_DIR } else { Join-Path $HOME 'Xbloom-Panel' }
 $Baud        = if ($env:XBP_BAUD) { $env:XBP_BAUD } else { '115200' }
-$PioPkg      = 'pioarduino==6.2.0.post1'   # the PlatformIO Core the ESP32 platform itself uses (see requirements-build.txt)
+$PioPkg      = 'pioarduino==6.1.19'   # the PlatformIO Core the ESP32 platform itself uses (see requirements-build.txt)
 $EnvName     = 'crowpanel-advance-43'
 $PioHome     = Join-Path $HOME '.platformio'
 $Penv        = Join-Path $PioHome 'penv'

@@ -18,7 +18,7 @@ set -euo pipefail
 REPO_URL="https://github.com/2B-4G10/Xbloom-Panel"
 DIR="${XBP_DIR:-$HOME/Xbloom-Panel}"
 BAUD="${XBP_BAUD:-115200}"
-PIO_PKG="pioarduino==6.2.0.post1"   # the PlatformIO Core the ESP32 platform itself uses (see requirements-build.txt)
+PIO_PKG="pioarduino==6.1.19"   # the PlatformIO Core the ESP32 platform itself uses (see requirements-build.txt)
 ENV_NAME="crowpanel-advance-43"
 PIO_HOME="$HOME/.platformio"
 PENV="$PIO_HOME/penv"
