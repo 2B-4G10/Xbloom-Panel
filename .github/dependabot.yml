@@ -13,13 +13,13 @@ updates:
       prefix: "deps(actions)"
 
   - package-ecosystem: pip
-    directory: /           # requirements-build.txt
+    directory: /           # requirements-build.txt (pioarduino core)
     schedule:
       interval: weekly
     commit-message:
       prefix: "deps(build)"
     ignore:
-      # PlatformIO 6.2+ ships an SCons the pioarduino ESP32 platform can't load
-      # ("No module named 'SCons.Tool.FortranCommon'"). Remove once the platform supports it.
-      - dependency-name: platformio
+      # pioarduino must match the ESP32 platform's SCons (see requirements-build.txt);
+      # 6.2.x needs a newer platform than the one pinned in platformio.ini.
+      - dependency-name: pioarduino
         versions: [">=6.2"]

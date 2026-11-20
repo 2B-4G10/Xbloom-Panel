@@ -65,7 +65,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/sc
 | 🛠️ Apple command-line tools | Needed for `git`. If missing, the installer opens Apple's installer and asks you to run it again afterwards. |
 | 🍺 Homebrew | Finds it, or offers to install it from [brew.sh](https://brew.sh). |
 | 🐍 Python 3.10–3.14 | The ESP32 tools don't support newer Python yet. If your Mac only has a newer one, it installs Python 3.13 alongside it. |
-| ⚙️ PlatformIO 6.1.19 | The build tool, pinned to a version known to work with this board. It also repairs an existing install that uses the wrong Python. |
+| ⚙️ PlatformIO (pioarduino core) | The build tool, the same version the ESP32 platform uses for part of the build. It also repairs an older or mismatched install. |
 | 📟 esptool | Used to back up and flash the panel. |
 | 🔌 USB driver | Detects the panel's **WCH CH34x** USB chip. If the driver is missing it installs it. If macOS is waiting for your approval, it opens the right Settings page: **General → Login Items & Extensions → Driver Extensions → CH34xVCPDriver**. |
 | 🔎 Port | Finds the panel automatically and ignores Bluetooth headphones and similar ports. |
@@ -92,7 +92,7 @@ irm https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/scripts/flash-wi
 | 📦 winget | Windows' built-in app installer, used for everything below. If it's missing, install **App Installer** from the Microsoft Store. |
 | 🌿 Git | Installed with winget if missing. |
 | 🐍 Python 3.10–3.14 | Finds a suitable one, or installs Python 3.13. |
-| ⚙️ PlatformIO 6.1.19 | Installed and pinned to the version that works with this board. |
+| ⚙️ PlatformIO (pioarduino core) | Installed in the version the ESP32 platform itself uses, so the build doesn't mix two versions. |
 | 📟 esptool | Used to back up and flash the panel. |
 | 🔌 USB driver | Looks for the panel's **WCH** chip (USB ID `1A86`). If it has no COM port, the installer opens WCH's official driver page (CH341SER or CH343SER, whichever matches your chip). Run the EXE, click **INSTALL**, then replug the panel. |
 | 🔎 Port | Finds the panel's `COM` port automatically. |
@@ -205,7 +205,7 @@ PlatformIO was installed with a Python that's too new. Run the installer again: 
 <details>
 <summary><b>"No module named 'SCons.Tool.FortranCommon'"</b></summary>
 
-The PlatformIO version is too new for this board's tools. Run the installer again: it pins PlatformIO to 6.1.19.
+Two different PlatformIO versions ended up in the same build (stock PlatformIO plus the pioarduino version the ESP32 platform installs). Run the installer again: it switches to the pioarduino version in `requirements-build.txt` for the whole build.
 </details>
 
 <details>
@@ -237,8 +237,9 @@ This puts the panel back exactly as it was when you made the backup, settings in
 ## 🧑‍💻 Building by hand
 
 ```bash
-pip install "platformio==6.1.19"   # in a Python 3.10–3.14 environment
-pio run                            # first build compiles ESP-IDF with the settings in platformio.ini
+python3 -m venv ~/.platformio/penv          # Python 3.10–3.14; the ESP32 platform uses this environment too
+~/.platformio/penv/bin/pip install -r requirements-build.txt   # pioarduino core
+~/.platformio/penv/bin/pio run              # first build compiles ESP-IDF with the settings in platformio.ini
 ```
 
 The boot logo is `src/boot_logo.c`, a 720×189 8-bit alpha map that the firmware draws in white on black. `sim/` renders the UI on a desktop for layout checks.

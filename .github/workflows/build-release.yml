@@ -54,14 +54,22 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements-build.txt') }}
-          restore-keys: pio-${{ runner.os }}-
+          key: pio-v2-${{ runner.os }}-py312-${{ hashFiles('platformio.ini', 'requirements-build.txt') }}
+          restore-keys: pio-v2-${{ runner.os }}-py312-
 
+      # The ESP32 platform runs a nested build with the PlatformIO Core in ~/.platformio/penv
+      # (it installs the pioarduino fork there). Install that same core there first and use it
+      # for the whole build, so both halves share one SCons.
       - name: Install build tools
-        run: pip install -r requirements-build.txt
+        run: |
+          python -m venv ~/.platformio/penv
+          ~/.platformio/penv/bin/python -m pip install -q --upgrade pip
+          ~/.platformio/penv/bin/python -m pip uninstall -y -q platformio || true
+          ~/.platformio/penv/bin/python -m pip install -q -r requirements-build.txt
+          ~/.platformio/penv/bin/pio --version
 
       - name: Build
-        run: pio run -e "$PIO_ENV"
+        run: ~/.platformio/penv/bin/pio run -e "$PIO_ENV"
 
       - name: Collect the firmware files
         id: meta
