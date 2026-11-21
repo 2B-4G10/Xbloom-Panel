@@ -86,6 +86,8 @@ jobs:
         if: steps.import.outputs.status == 'readme-only' || (steps.import.outputs.status == 'imported' && steps.build.outcome == 'success')
         run: git push -q origin HEAD:main && echo "✓ Upstream changes are on main; they'll be in the next weekly release."
 
+      # Opens an issue if Issues are enabled; otherwise (or as well) the run summary explains it
+      # and the run is marked failed, so GitHub emails the repo owner.
       - name: Report a sync that needs a hand
         if: steps.import.outputs.status == 'conflict' || (steps.import.outputs.status == 'imported' && steps.build.outcome != 'success')
         env:
@@ -93,14 +95,21 @@ jobs:
           NEW: ${{ steps.import.outputs.new }}
           WHY: ${{ steps.import.outputs.status == 'conflict' && 'they clash with the Double Shot changes' || 'the firmware does not build with them' }}
         run: |
-          if [ -n "$(gh issue list --state open --search 'in:title Upstream sync needs a hand' --json number --jq '.[].number')" ]; then
-            echo "An open sync issue already exists; not opening another."; exit 0
-          fi
           {
+            echo "### ✋ Upstream sync needs a hand (Mesh-one/Xbloom-panel@${NEW:0:7})"
+            echo
             echo "The daily sync couldn't bring in these upstream changes automatically, because $WHY:"
             echo; cat upstream-commits.md; echo
             if [ -s conflicts.txt ]; then echo "Files that clash:"; awk '{print "- `" $0 "`"}' conflicts.txt; echo; fi
-            echo "Nothing on \`main\` was changed. See the [workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) for the details."
-            echo "Once resolved by hand, update \`$STATE\` to \`$NEW\` so the next sync starts from there."
+            echo "Nothing on \`main\` was changed. Details: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Once resolved by hand, set \`$STATE\` to \`$NEW\` so the next sync starts from there."
           } > body.md
-          gh issue create --title "Upstream sync needs a hand (Mesh-one/Xbloom-panel@${NEW:0:7})" --body-file body.md
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+          if gh issue list --state open --search 'in:title Upstream sync needs a hand' --json number --jq '.[].number' 2>/dev/null | grep -q .; then
+            echo "An open sync issue already exists."
+          else
+            gh issue create --title "Upstream sync needs a hand (Mesh-one/Xbloom-panel@${NEW:0:7})" --body-file body.md \
+              || echo "Issues are turned off for this repo; the run summary has the details."
+          fi
+          echo "::error::Upstream changes need a hand: $WHY. See the run summary."
+          exit 1
