@@ -77,8 +77,9 @@ jobs:
           VER=$(sed -n "s/.*FW_VERSION='\"\([^\"]*\)\"'.*/\1/p" platformio.ini)
           B=".pio/build/$PIO_ENV"
           mkdir dist
-          cp "$B/firmware.bin"         dist/xbloom-panel-doubleshot-update.bin   # Wi-Fi update page
-          cp "$B/firmware.factory.bin" dist/xbloom-panel-doubleshot-full.bin     # USB, address 0x0
+          # Names say how each file may be installed, to avoid mix-ups:
+          cp "$B/firmware.bin"         dist/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin  # Wi-Fi update page (or USB at 0x10000)
+          cp "$B/firmware.factory.bin" dist/xbloom-panel-doubleshot-FULL-USB-ONLY.bin       # USB only, at 0x0
           (cd dist && sha256sum ./*.bin | sed "s#\./##" > SHA256SUMS.txt && cat SHA256SUMS.txt)
           echo "version=${VER:-dev}" >> "$GITHUB_OUTPUT"
 
@@ -117,11 +118,14 @@ jobs:
             LOG=$(git log --no-merges --pretty='- %s (%h)' "${RANGE[@]}" -- . ':!CHANGELOG.md')
             echo "${LOG:-- Rebuilt with no source changes}"
             echo
-            echo "## 📦 Files"
-            echo "| File | Use it for |"
-            echo "|---|---|"
-            echo "| \`xbloom-panel-doubleshot-update.bin\` | Panel **Settings → Software update** over Wi-Fi (keeps your settings) |"
-            echo "| \`xbloom-panel-doubleshot-full.bin\` | First install over USB, written at address \`0x0\` |"
+            echo "## 📦 Which file do I need?"
+            echo
+            echo "| File | How to install it | Your settings |"
+            echo "|---|---|---|"
+            echo "| 🛜 \`xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin\` | **Wi-Fi:** on the panel, **Settings → Software update**, then upload this file from your phone. (USB also works, written at address \`0x10000\`.) | ✅ Kept |"
+            echo "| 🔌 \`xbloom-panel-doubleshot-FULL-USB-ONLY.bin\` | **USB cable only**, written at address \`0x0\` (first install, or to recover a panel). | ⚠️ Reset (Wi-Fi and xBloom login) |"
+            echo
+            echo "> ⛔ **Never upload the FULL-USB-ONLY file on the panel's Wi-Fi update page.** It is a whole-flash image for USB and won't work as a Wi-Fi update."
             echo
             echo "SHA-256:"
             echo '```'
@@ -136,7 +140,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VER: ${{ needs.build.outputs.version }}
         run: |
-          gh release create "$TAG" dist/xbloom-panel-doubleshot-update.bin dist/xbloom-panel-doubleshot-full.bin dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin dist/xbloom-panel-doubleshot-FULL-USB-ONLY.bin dist/SHA256SUMS.txt \
             --target "$GITHUB_SHA" --title "xBloom Panel $VER · Double Shot (build ${GITHUB_RUN_NUMBER})" \
             --notes-file notes.md --latest
 
@@ -146,7 +150,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -q main && git pull -q --ff-only
           { echo "# Changelog"; echo; echo "## [$TAG](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG) · $(date -u +%Y-%m-%d)"; echo;
-            sed '1,2d' notes.md | sed -n '/^## 📦 Files/q;p'; if [ -f CHANGELOG.md ]; then sed '1,2d' CHANGELOG.md; fi; } > CHANGELOG.new
+            sed '1,2d' notes.md | sed -n '/^## 📦 Which file/q;p'; if [ -f CHANGELOG.md ]; then sed '1,2d' CHANGELOG.md; fi; } > CHANGELOG.new
           mv CHANGELOG.new CHANGELOG.md
           git add CHANGELOG.md
           git commit -q -m "Changelog for $TAG [skip ci]"

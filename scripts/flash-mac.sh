@@ -5,7 +5,8 @@
 # Python 3.10–3.14, PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the
 # panel, backs up its current firmware, builds this repo and flashes it.
 #
-# Run:   bash <(curl -fsSL https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/scripts/flash-mac.sh)
+# Run (the repo is private, so sign in with the GitHub CLI first; see README, Method 3):
+#   brew install gh && gh auth login && gh repo clone 2B-4G10/Xbloom-Panel ~/Xbloom-Panel && bash ~/Xbloom-Panel/scripts/flash-mac.sh
 #
 # Options (environment variables):
 #   XBP_PORT=/dev/cu.xxx   use this serial port instead of auto-detecting
@@ -198,7 +199,7 @@ BOOT_APP0="$PIO_HOME/packages/framework-arduinoespressif32/tools/partitions/boot
 for f in "$B/bootloader.bin" "$B/partitions.bin" "$B/firmware.bin" "$BOOT_APP0"; do
   [[ -s "$f" ]] || die "Expected build output is missing: $f"
 done
-UPDATE_BIN="$HOME/Desktop/xbloom-panel-${FW_VERSION:-dev}-doubleshot-update.bin"
+UPDATE_BIN="$HOME/Desktop/xbloom-panel-${FW_VERSION:-dev}-doubleshot-UPDATE-WiFi-or-USB.bin"
 cp "$B/firmware.bin" "$UPDATE_BIN"
 ok "Wi-Fi update file: $UPDATE_BIN"
 

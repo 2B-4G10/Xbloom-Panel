@@ -4,8 +4,9 @@
 # PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the panel, backs up
 # its current firmware, builds this repo and flashes it.
 #
-# Run in PowerShell:
-#   irm https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/scripts/flash-windows.ps1 | iex
+# Run in PowerShell (the repo is private; sign in with the GitHub CLI first, see README, Method 3):
+#   gh auth login; gh repo clone 2B-4G10/Xbloom-Panel "$HOME\Xbloom-Panel"
+#   powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1"
 #
 # Options (set before running, e.g.  $env:XBP_NO_BACKUP = "1"):
 #   XBP_PORT=COM5          use this port instead of auto-detecting
@@ -197,7 +198,7 @@ $BootApp0 = Join-Path $PioHome 'packages\framework-arduinoespressif32\tools\part
 foreach ($f in "$B\bootloader.bin","$B\partitions.bin","$B\firmware.bin",$BootApp0) {
   if (-not (Test-Path $f)) { Die "Expected build output is missing: $f" }
 }
-$UpdateBin = Join-Path $Desktop "xbloom-panel-$FwVersion-doubleshot-update.bin"
+$UpdateBin = Join-Path $Desktop "xbloom-panel-$FwVersion-doubleshot-UPDATE-WiFi-or-USB.bin"
 Copy-Item "$B\firmware.bin" $UpdateBin -Force -ErrorAction Stop
 Ok "Wi-Fi update file: $UpdateBin"
 
