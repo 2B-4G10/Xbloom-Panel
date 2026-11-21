@@ -59,7 +59,8 @@ uint32_t sw_start = 0, sw_elapsed = 0;
 
 // screens
 lv_obj_t *scr_home, *scr_detail, *scr_grinder, *scr_brewer, *scr_scale;
-lv_obj_t *page_home, *page_recipes, *page_settings, *tab_lbl[3];
+lv_obj_t *page_home, *page_recipes, *page_settings, *tab_lbl[4];
+lv_obj_t *scr_store, *sb_bar;  // Double Shot page (last tab); status bar group
 lv_obj_t *home_name, *home_chev, *home_status, *home_spin, *home_dot, *fav_row;
 lv_obj_t *seg_pill, *seg_lbl[3], *rec_list;
 int seg = 0;
@@ -110,6 +111,7 @@ int seg_of(const PanelRecipe &p) { return p.kind == KIND_SHARED ? 1 : p.kind == 
 lv_obj_t *pill(lv_obj_t *parent, int x, int y, int w, int h, const char *label, uint32_t bg, uint32_t fg,
                lv_event_cb_t cb);
 void open_editor(uint32_t uid);
+void open_store(lv_event_t *);
 void open_account(lv_event_t * = nullptr);
 void toggle_favorite(uint32_t uid);
 lv_obj_t *st_acc_val;
@@ -482,7 +484,7 @@ void on_recipe_tile(lv_event_t *e) {
 // STATUS BAR (on the top layer, shared by every screen)
 // ============================================================================
 void build_status_bar() {
-  lv_obj_t *bar = group(lv_layer_top(), 0, 0, W, SB);
+  lv_obj_t *bar = sb_bar = group(lv_layer_top(), 0, 0, W, SB);
   sb_clock = text(bar, "", &inter_16, hex(TEXT));
   lv_obj_align(sb_clock, LV_ALIGN_CENTER, 0, 2);  // left side holds the machine name on Home
   sb_bt = text(bar, LV_SYMBOL_BLUETOOTH, &lv_font_montserrat_16, hex(MUTED));
@@ -1170,14 +1172,101 @@ void build_home_screen() {
   build_settings_page(page_settings);
   lv_obj_t *bar = box(scr_home, 0, H - TABBAR_H, W, TABBAR_H, TABBAR, 0);
   box(bar, 0, 0, W, 1, HAIRLINE, 0);
-  const char *tabs[3] = {"xBloom", "Recipes", "Settings"};
-  for (int i = 0; i < 3; ++i) {
-    lv_obj_t *hit = group(bar, i * W / 3, 0, W / 3, TABBAR_H);
+  // Three page tabs, then "Double Shot", which opens its own full-screen page.
+  const char *tabs[4] = {"xBloom", "Recipes", "Settings", "Double Shot"};
+  for (int i = 0; i < 4; ++i) {
+    lv_obj_t *hit = group(bar, i * W / 4, 0, W / 4, TABBAR_H);
     tab_lbl[i] = text(hit, tabs[i], &inter_20b, hex(MUTED));
     lv_obj_center(tab_lbl[i]);
-    on_click(hit, [](lv_event_t *e) { set_tab((int)(intptr_t)lv_event_get_user_data(e)); }, (void *)(intptr_t)i);
+    if (i == 3) {
+      on_click(hit, open_store);
+      pressable(hit);
+    } else {
+      on_click(hit, [](lv_event_t *e) { set_tab((int)(intptr_t)lv_event_get_user_data(e)); }, (void *)(intptr_t)i);
+    }
   }
   set_tab(0);
+}
+
+// ============================================================================
+// DOUBLE SHOT (last tab)
+// doubleshot-sa.com is a JavaScript web store, which the panel can't run (there is
+// no web browser on an ESP32). So this is a native page about the store, with QR
+// codes that open the store and WhatsApp on a phone. Full screen, big X to close.
+// ============================================================================
+const char *const STORE_URL = "https://doubleshot-sa.com";
+const char *const STORE_WHATSAPP_URL = "https://wa.me/966502065920";
+
+void close_store(lv_event_t *) { load(scr_home, Anim::DropDown); }
+
+void open_store(lv_event_t *) {
+  show(sb_bar, false);  // full page: hide the status bar; it comes back when the page closes
+  load(scr_store, Anim::RiseUp);
+}
+
+// White card with a QR code and two caption lines (dark on white so phones scan it easily).
+lv_obj_t *qr_card(lv_obj_t *parent, int x, int y, const char *url, const char *title, const char *sub) {
+  const int CW = 168, CH = 236, QR = 140;
+  lv_obj_t *c = box(parent, x, y, CW, CH, 0xFFFFFF, R_SM);
+  lv_obj_t *q = lv_qrcode_create(c);
+  lv_qrcode_set_size(q, QR);
+  lv_qrcode_set_dark_color(q, hex(0x000000));
+  lv_qrcode_set_light_color(q, hex(0xFFFFFF));
+  lv_qrcode_update(q, url, strlen(url));
+  lv_obj_align(q, LV_ALIGN_TOP_MID, 0, 14);
+  lv_obj_t *t = text(c, title, &inter_20b, hex(0x111111));
+  lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 14 + QR + 12);
+  lv_obj_t *st = text(c, sub, &inter_14, hex(0x5C5C60));
+  lv_obj_align_to(st, t, LV_ALIGN_OUT_BOTTOM_MID, 0, 4);
+  return c;
+}
+
+void build_store() {
+  scr_store = new_screen(BG);
+  lv_obj_add_event_cb(scr_store, [](lv_event_t *) { show(sb_bar, true); }, LV_EVENT_SCREEN_UNLOADED, nullptr);
+
+  // Logo (white on black, like the boot screen)
+  lv_obj_t *logo = lv_image_create(scr_store);
+  lv_image_set_src(logo, &store_logo);
+  lv_obj_set_pos(logo, M, 26);
+  lv_obj_set_style_image_recolor(logo, hex(TEXT), 0);
+  lv_obj_set_style_image_recolor_opa(logo, LV_OPA_COVER, 0);
+
+  // Big close button, top right (112x112 touch area around a 64 px circle)
+  lv_obj_t *xhit = group(scr_store, W - 112, 0, 112, 112);
+  lv_obj_t *xc = box(xhit, 112 - M - 64, M, 64, 64, SEG_BG, 32);
+  lv_obj_center(text(xc, LV_SYMBOL_CLOSE, &lv_font_montserrat_28, hex(TEXT)));
+  on_click(xhit, close_store);
+  pressable(xhit);
+
+  lv_obj_t *tag = text(scr_store, "Scan a code with your phone to shop online or chat on WhatsApp.", &inter_20, hex(SUB));
+  lv_obj_set_pos(tag, M, 152);
+
+  // Left column: categories and brands from the store
+  const int COL_W = 380, BODY_Y = 204;
+  lv_obj_t *h1 = text(scr_store, "SHOP BY CATEGORY", &inter_14, hex(MUTED));
+  lv_obj_set_pos(h1, M, BODY_Y);
+  const char *cats[6] = {"Roasters", "Grinders", "Drip & brew", "Espresso tools", "Kettles & cups", "Cleaning"};
+  const int CHIP_W = (COL_W - 2 * 10) / 3, CHIP_H = 48;
+  for (int i = 0; i < 6; ++i) {
+    lv_obj_t *chip = box(scr_store, M + (i % 3) * (CHIP_W + 10), BODY_Y + 26 + (i / 3) * (CHIP_H + 10), CHIP_W,
+                         CHIP_H, SURFACE, R_SM);
+    lv_obj_center(text(chip, cats[i], &inter_16, hex(TEXT)));
+  }
+  lv_obj_t *h2 = text(scr_store, "FEATURED BRANDS", &inter_14, hex(MUTED));
+  lv_obj_set_pos(h2, M, BODY_Y + 26 + 2 * CHIP_H + 10 + 22);
+  lv_obj_t *brands = text(scr_store,
+                          "Mahlk\xc3\xb6nig \xc2\xb7 xBloom \xc2\xb7 La Marzocco \xc2\xb7 Rocket \xc2\xb7 TIMEMORE"
+                          " \xc2\xb7 Brewista \xc2\xb7 AeroPress \xc2\xb7 illy",
+                          &inter_16, hex(SUB));
+  lv_obj_set_width(brands, COL_W);
+  lv_label_set_long_mode(brands, LV_LABEL_LONG_WRAP);
+  lv_obj_align_to(brands, h2, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 8);
+
+  // Right: scan to open the store or WhatsApp on a phone
+  const int CARD_GAP = 16, CARDS_X = W - M - 2 * 168 - CARD_GAP;
+  qr_card(scr_store, CARDS_X, BODY_Y, STORE_URL, "Shop online", "doubleshot-sa.com");
+  qr_card(scr_store, CARDS_X + 168 + CARD_GAP, BODY_Y, STORE_WHATSAPP_URL, "WhatsApp", "+966 50 206 5920");
 }
 
 // ============================================================================
@@ -2450,6 +2539,7 @@ void begin() {
   build_editor();
   build_account();
   build_update();
+  build_store();
   build_status_bar();
   build_modal();
   build_confirm();
@@ -2584,6 +2674,8 @@ void sim_show(int which, int recipe) {
     }
     case 26: brew_ended(); break;
     case 27: lv_screen_load(scr_home); set_tab(2); lv_dropdown_open(st_sleep_dd); break;
+    case 28: open_store(nullptr); break;
+    case 29: close_store(nullptr); break;
     case 22: dotfx::finish_play(lib[recipe].r.name, 141.3f, 220, 181000); break;
     case 23: clock_color = dotfx::WHITE; show_clock(true); break;
     case 24: clock_color = dotfx::BLUE; show_clock(true); break;

@@ -161,6 +161,12 @@ Every release has:
 - ✏️ Edit recipes or create new ones on the panel
 - 🕰️ Dot-matrix idle clock (white, blue or brown) and adjustable sleep time
 - 🔄 Recipe sync button and over-the-air updates
+- 🛍️ A **Double Shot** tab: a full-screen page with the store's categories and brands, plus QR codes that open [doubleshot-sa.com](https://doubleshot-sa.com) or WhatsApp on your phone (tap the big ✕ to close)
+
+<div align="center">
+  <img alt="The Double Shot tab on the panel" src="docs/images/store-page.png" width="520"><br>
+  <sub>The Double Shot tab. The panel has no web browser, so the codes open the store on your phone.</sub>
+</div>
 
 ---
 
