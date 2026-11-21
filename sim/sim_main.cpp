@@ -44,6 +44,13 @@ int main(int argc, char **argv) {
   lv_display_set_buffers(d, buf, nullptr, sizeof buf, LV_DISPLAY_RENDER_MODE_PARTIAL);
   ui::splash(); save("boot_logo.ppm");
   ui::begin(); run(300); save("0_connecting.ppm");
+  if (argc > 1 && !strcmp(argv[1], "store")) {
+    ev(UiEvType::Link, 3, 0, "XBLOOM 381"); run(500);
+    save("ds_tabbar.ppm");
+    ui::sim_show(28, 0); run(800); save("ds_store.ppm");
+    ui::sim_show(29, 0); run(800); save("ds_closed.ppm");
+    return 0;
+  }
   if (argc > 1 && !strcmp(argv[1], "settings")) {
     ev(UiEvType::Link, 3, 0, "XBLOOM 381"); run(500);
     ui::sim_show(9, 0); run(800); save("st_settings.ppm");
