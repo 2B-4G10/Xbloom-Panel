@@ -1,5 +1,10 @@
 # Changelog
 
+## [v3.3.1-ds.10](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.10) · 2026-11-21
+
+- deps(actions): bump the github-actions group with 5 updates (ca87ca2)
+- Add a Double Shot tab: full-screen store page with QR codes (cc25ba4)
+
 ## [v3.3.1-ds.7](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.7) · 2026-11-21
 
 - Pin pioarduino 6.1.19 to match the platform's SCons 4.8.1 (976c48e)
