@@ -11,7 +11,7 @@ updates:
       - "/.github/actions/build-firmware"
     schedule:
       interval: weekly
-      day: monday
+      day: monday          # Sun upstream sync · Mon Dependabot · Tue platform check · Wed release
       time: "06:00"
       timezone: Asia/Riyadh
     groups:

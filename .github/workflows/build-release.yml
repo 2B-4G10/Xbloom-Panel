@@ -1,20 +1,12 @@
 # Firmware builds and weekly releases.
-# - Every firmware change (push to main, pull requests incl. Dependabot's) is built as a check.
-# - Every Wednesday, if anything changed since the last release, a new release is published
-#   with the .bin files and a changelog. "Run workflow" does the same on demand.
+# - Pull requests (incl. Dependabot's) that touch the firmware or the build are built as a check.
+# - Every Wednesday, if anything changed since the last release, the firmware is built and a
+#   new release is published with the .bin files and a changelog. "Run workflow" does the
+#   same on demand. (Weekly schedule: Sun upstream sync · Mon Dependabot · Tue platform check
+#   · Wed release.)
 name: Build & release firmware
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "include/**"
-      - "boards/**"
-      - "platformio.ini"
-      - "partitions.csv"
-      - "requirements-build.txt"
-      - ".github/**"
   pull_request:
     paths:
       - "src/**"
@@ -25,7 +17,7 @@ on:
       - "requirements-build.txt"
       - ".github/**"
   schedule:
-    - cron: "17 18 * * 3"   # weekly release: Wednesday 18:17 UTC (21:17 Riyadh)
+    - cron: "17 18 * * 3"   # weekly: Wednesday 18:17 UTC (21:17 Riyadh), after the week's updates
   workflow_dispatch:
     inputs:
       force:
@@ -71,7 +63,7 @@ jobs:
 
   build:
     needs: check
-    if: github.event_name == 'push' || github.event_name == 'pull_request' || needs.check.outputs.release == 'true'
+    if: github.event_name == 'pull_request' || needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     outputs:

@@ -10,7 +10,7 @@ name: Update build essentials
 
 on:
   schedule:
-    - cron: "41 4 * * 1"   # weekly, Monday 04:41 UTC
+    - cron: "41 4 * * 2"   # weekly: Tuesday 04:41 UTC (07:41 Riyadh), the day after Dependabot
   workflow_dispatch:
 
 permissions:
@@ -78,7 +78,8 @@ jobs:
           git add platformio.ini requirements-build.txt
           git commit -q -m "Update ESP32 platform $CUR → $NEW (pioarduino core $CORE)" \
                         -m "Built successfully before committing. Release notes: https://github.com/pioarduino/platform-espressif32/releases/tag/$NEW"
-          git push -q origin HEAD:main && echo "✓ Updated; it will be in the next weekly release."
+          git push -q origin HEAD:main || { git pull -q --rebase origin main && git push -q origin HEAD:main; }
+          echo "✓ Updated; it will be in the next weekly release."
 
       # Record the failed version so it isn't rebuilt every week, and say why on main.
       - name: Hold the platform at the working version
@@ -97,7 +98,7 @@ jobs:
           git commit -q -m "Hold ESP32 platform at $CUR: $NEW doesn't build yet" \
             -m "Tried platform $NEW with pioarduino core $CORE; the firmware build failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             -m "Retried automatically when a newer platform is released or platformio.ini changes."
-          git push -q origin HEAD:main
+          git push -q origin HEAD:main || { git pull -q --rebase origin main && git push -q origin HEAD:main; }
           {
             echo "### ⏸ ESP32 platform held at $CUR"
             echo "Platform **$NEW** (pioarduino core $CORE) doesn't build with this firmware yet, so \`main\` stays on **$CUR**."

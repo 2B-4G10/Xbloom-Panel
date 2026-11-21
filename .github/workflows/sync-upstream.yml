@@ -1,5 +1,5 @@
 # Brings new fixes and features from the original project (Mesh-one/Xbloom-panel) into this
-# repo every day.
+# repo once a week (Sunday), ahead of Monday's dependency updates and Wednesday's release.
 #
 # Upstream changes are imported as ONE commit per sync (not upstream's own commits), applied
 # with a 3-way merge on top of the Double Shot changes. The import is built first and only
@@ -12,7 +12,7 @@ name: Sync with the original repo
 
 on:
   schedule:
-    - cron: "23 3 * * *"   # daily, 03:23 UTC
+    - cron: "23 3 * * 0"   # weekly: Sunday 03:23 UTC (06:23 Riyadh)
   workflow_dispatch:
 
 permissions:
@@ -84,7 +84,10 @@ jobs:
 
       - name: Push to main
         if: steps.import.outputs.status == 'readme-only' || (steps.import.outputs.status == 'imported' && steps.build.outcome == 'success')
-        run: git push -q origin HEAD:main && echo "✓ Upstream changes are on main; they'll be in the next weekly release."
+        run: |
+          # If main moved meanwhile (e.g. a merged update), replay onto it once and push again.
+          git push -q origin HEAD:main || { git pull -q --rebase origin main && git push -q origin HEAD:main; }
+          echo "✓ Upstream changes are on main; they'll be in the next weekly release."
 
       # Opens an issue if Issues are enabled; otherwise (or as well) the run summary explains it
       # and the run is marked failed, so GitHub emails the repo owner.
@@ -98,7 +101,7 @@ jobs:
           {
             echo "### ✋ Upstream sync needs a hand (Mesh-one/Xbloom-panel@${NEW:0:7})"
             echo
-            echo "The daily sync couldn't bring in these upstream changes automatically, because $WHY:"
+            echo "The weekly sync couldn't bring in these upstream changes automatically, because $WHY:"
             echo; cat upstream-commits.md; echo
             if [ -s conflicts.txt ]; then echo "Files that clash:"; awk '{print "- `" $0 "`"}' conflicts.txt; echo; fi
             echo "Nothing on \`main\` was changed. Details: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
