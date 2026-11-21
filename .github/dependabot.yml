@@ -1,25 +1,21 @@
-# Dependabot keeps the build tools and the GitHub Actions used by the workflows up to date.
-# Its pull requests are built by build-release.yml as a check (no release until merged).
+# Dependabot opens weekly update PRs for the GitHub Actions used by the workflows.
+# Each PR is test-built by build-release.yml, then merged automatically by
+# dependabot-automerge.yml once the build passes.
+# The ESP32 platform and its pioarduino core are updated together by essentials-bump.yml
+# (Dependabot can't keep them in step). Libraries follow the original project (sync-upstream.yml).
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - "/"
+      - "/.github/actions/build-firmware"
     schedule:
       interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Riyadh
     groups:
       github-actions:
         patterns: ["*"]
     commit-message:
       prefix: "deps(actions)"
-
-  - package-ecosystem: pip
-    directory: /           # requirements-build.txt (pioarduino core)
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: "deps(build)"
-    ignore:
-      # pioarduino must match the ESP32 platform's SCons (see requirements-build.txt);
-      # 6.2.x needs a newer platform than the one pinned in platformio.ini.
-      - dependency-name: pioarduino
-        versions: [">=6.2"]

@@ -154,11 +154,13 @@ Use **Method 2**, but choose your backup file (in `Desktop/xBloom-backups`) inst
 
 ---
 
-## 🤖 How the releases are made
+## 🤖 How it stays up to date
 
-- Every change to the firmware is built automatically and published as a new [release](https://github.com/2B-4G10/Xbloom-Panel/releases), with a [changelog](CHANGELOG.md).
-- Fixes from the [original project](https://github.com/Mesh-one/Xbloom-panel) are pulled in daily. A fix that clashes with the Double Shot changes opens an "Upstream sync" pull request instead.
-- Dependabot keeps the build tools up to date.
+| When | What happens automatically |
+|---|---|
+| **Daily** | New fixes and features from the [original project](https://github.com/Mesh-one/Xbloom-panel) are imported. They're built first and only added if the firmware builds. If they clash with the Double Shot changes, an issue is opened instead. |
+| **Monday** | Dependabot updates the build automation, and the ESP32 platform is updated with its matching build tool. Each update is test-built first and added only if it passes. |
+| **Wednesday** | If anything changed that week, a new [release](https://github.com/2B-4G10/Xbloom-Panel/releases) is published with both `.bin` files and a [changelog](CHANGELOG.md). |
 
 <details>
 <summary>🧑‍💻 Building by hand</summary>

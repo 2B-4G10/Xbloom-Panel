@@ -1,8 +1,13 @@
-# Pulls new fixes from the original project (Mesh-one/Xbloom-panel) into this fork every day.
-# - Clean merge: pushed to main, then a new firmware build + release is started.
-# - Conflict (e.g. upstream changed the same lines as the boot logo): opens a pull request
-#   named "Upstream sync" so it can be resolved by hand. Nothing on main changes.
-# Our README is always kept (see .gitattributes).
+# Brings new fixes and features from the original project (Mesh-one/Xbloom-panel) into this
+# repo every day.
+#
+# Upstream changes are imported as ONE commit per sync (not upstream's own commits), applied
+# with a 3-way merge on top of the Double Shot changes. The import is built first and only
+# lands on main if the firmware builds. If it doesn't apply cleanly or doesn't build, an
+# issue is opened with the details and main is left untouched.
+#
+# .github/upstream-sync.sha holds the last upstream commit already imported.
+# Our README is kept as-is (upstream's README changes are skipped).
 name: Sync with the original repo
 
 on:
@@ -11,63 +16,91 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write        # push the merge to main
-  pull-requests: write   # open a PR when there's a conflict
-  actions: write         # start the build & release workflow
+  contents: write   # push the import to main
+  issues: write     # report a sync that needs a hand
+
+concurrency:
+  group: writes-to-main
+  cancel-in-progress: false
 
 env:
   UPSTREAM: https://github.com/Mesh-one/Xbloom-panel.git
   UPSTREAM_BRANCH: main
+  STATE: .github/upstream-sync.sha
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Merge upstream
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Import new upstream changes
+        id: import
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config merge.ours.driver true   # used by .gitattributes to keep our README
-
           git remote add upstream "$UPSTREAM"
           git fetch -q upstream "$UPSTREAM_BRANCH"
-
-          if git merge-base --is-ancestor "upstream/$UPSTREAM_BRANCH" HEAD; then
-            echo "✓ Already up to date with $UPSTREAM"
-            exit 0
+          LAST=$(tr -d '[:space:]' < "$STATE")
+          NEW=$(git rev-parse "upstream/$UPSTREAM_BRANCH")
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          if [ "$LAST" = "$NEW" ]; then
+            echo "✓ Up to date with upstream ($NEW)."; echo "status=uptodate" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          NEW=$(git rev-list --count "HEAD..upstream/$UPSTREAM_BRANCH")
-          echo "Upstream has $NEW new commit(s):"
-          git log --oneline "HEAD..upstream/$UPSTREAM_BRANCH"
+          N=$(git rev-list --count "$LAST..$NEW")
+          git log --reverse --pretty='- %s (Mesh-one/Xbloom-panel@%h)' "$LAST..$NEW" > upstream-commits.md
+          echo "Upstream has $N new commit(s):"; cat upstream-commits.md
 
-          if git merge --no-edit -m "Merge $NEW upstream fix(es) from Mesh-one/Xbloom-panel" "upstream/$UPSTREAM_BRANCH"; then
-            if git push origin HEAD:main; then
-              echo "✓ Merged and pushed. Starting a new firmware build + release…"
-              gh workflow run build-release.yml --ref main
-              exit 0
-            fi
-            echo "::warning::Push was refused (upstream may have changed workflow files, which the built-in token can't push). Opening a PR instead."
-          else
-            echo "::warning::Merge conflict with upstream. Opening a PR to resolve by hand."
-            git merge --abort
+          # Upstream's changes since the last import, minus their README (we keep ours).
+          git diff --binary "$LAST" "$NEW" -- . ':!README.md' > upstream.patch
+          if [ ! -s upstream.patch ]; then
+            echo "Only README changes upstream; recording the new position."
+            echo "$NEW" > "$STATE"; git add "$STATE"
+            git commit -q -m "Upstream sync: README-only changes skipped (Mesh-one/Xbloom-panel@${NEW:0:7})"
+            echo "status=readme-only" >> "$GITHUB_OUTPUT"; exit 0
           fi
-
-          BRANCH=upstream-sync
-          git push -f origin "upstream/$UPSTREAM_BRANCH:refs/heads/$BRANCH"
-          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
-            gh pr create --base main --head "$BRANCH" \
-              --title "Upstream sync: $NEW new commit(s) from Mesh-one/Xbloom-panel" \
-              --body "Daily sync couldn't merge these upstream commits automatically (conflict or protected files). Resolve the conflicts here and merge; a new firmware release is built automatically after merging.
-
-          $(git log --pretty='- %s (%h)' "HEAD..upstream/$UPSTREAM_BRANCH")"
-          else
-            echo "An Upstream sync PR is already open; its branch was updated."
+          if ! git apply --3way --index upstream.patch 2> apply.log; then
+            echo "::warning::Upstream changes don't apply cleanly:"; cat apply.log
+            git diff --name-only --diff-filter=U > conflicts.txt || true
+            git reset -q --hard
+            echo "status=conflict" >> "$GITHUB_OUTPUT"; exit 0
           fi
+          echo "$NEW" > "$STATE"; git add "$STATE"
+          SUBJ="Upstream: $(git log --reverse --format=%s "$LAST..$NEW" | head -1)"
+          if [ "$N" -gt 1 ]; then SUBJ="$SUBJ (+$((N-1)) more)"; fi
+          { echo "$SUBJ"; echo; echo "Imported from Mesh-one/Xbloom-panel ${LAST:0:7}..${NEW:0:7}:"; echo; cat upstream-commits.md; } > msg.txt
+          git commit -q -F msg.txt
+          echo "status=imported" >> "$GITHUB_OUTPUT"
+
+      - name: Build the imported changes
+        id: build
+        if: steps.import.outputs.status == 'imported'
+        continue-on-error: true
+        uses: ./.github/actions/build-firmware
+
+      - name: Push to main
+        if: steps.import.outputs.status == 'readme-only' || (steps.import.outputs.status == 'imported' && steps.build.outcome == 'success')
+        run: git push -q origin HEAD:main && echo "✓ Upstream changes are on main; they'll be in the next weekly release."
+
+      - name: Report a sync that needs a hand
+        if: steps.import.outputs.status == 'conflict' || (steps.import.outputs.status == 'imported' && steps.build.outcome != 'success')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW: ${{ steps.import.outputs.new }}
+          WHY: ${{ steps.import.outputs.status == 'conflict' && 'they clash with the Double Shot changes' || 'the firmware does not build with them' }}
+        run: |
+          if [ -n "$(gh issue list --state open --search 'in:title Upstream sync needs a hand' --json number --jq '.[].number')" ]; then
+            echo "An open sync issue already exists; not opening another."; exit 0
+          fi
+          {
+            echo "The daily sync couldn't bring in these upstream changes automatically, because $WHY:"
+            echo; cat upstream-commits.md; echo
+            if [ -s conflicts.txt ]; then echo "Files that clash:"; awk '{print "- `" $0 "`"}' conflicts.txt; echo; fi
+            echo "Nothing on \`main\` was changed. See the [workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) for the details."
+            echo "Once resolved by hand, update \`$STATE\` to \`$NEW\` so the next sync starts from there."
+          } > body.md
+          gh issue create --title "Upstream sync needs a hand (Mesh-one/Xbloom-panel@${NEW:0:7})" --body-file body.md

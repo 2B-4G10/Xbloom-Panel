@@ -1,6 +1,7 @@
-# Builds the firmware (with the Double Shot boot logo) on every change and, on main,
-# publishes a GitHub release with the .bin files and an automatic changelog.
-# Pull requests (including Dependabot's) get the build as a check, without a release.
+# Firmware builds and weekly releases.
+# - Every firmware change (push to main, pull requests incl. Dependabot's) is built as a check.
+# - Every Wednesday, if anything changed since the last release, a new release is published
+#   with the .bin files and a changelog. "Run workflow" does the same on demand.
 name: Build & release firmware
 
 on:
@@ -13,7 +14,7 @@ on:
       - "platformio.ini"
       - "partitions.csv"
       - "requirements-build.txt"
-      - ".github/workflows/build-release.yml"
+      - ".github/**"
   pull_request:
     paths:
       - "src/**"
@@ -22,67 +23,63 @@ on:
       - "platformio.ini"
       - "partitions.csv"
       - "requirements-build.txt"
-      - ".github/workflows/build-release.yml"
-  workflow_dispatch:   # also started by sync-upstream.yml after merging upstream fixes
+      - ".github/**"
+  schedule:
+    - cron: "17 18 * * 3"   # weekly release: Wednesday 18:17 UTC (21:17 Riyadh)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Release even if nothing changed since the last release
+        type: boolean
+        default: false
 
 concurrency:
-  group: firmware-${{ github.ref }}
+  group: firmware-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
-env:
-  PIO_ENV: crowpanel-advance-43
-
 jobs:
+  # Decides whether this run publishes a release (weekly/manual runs with changes only).
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      prev: ${{ steps.decide.outputs.prev }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          PREV=$(git tag --merged HEAD --list 'v*-ds.*' --sort=-creatordate | head -1)
+          echo "prev=$PREV" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" != schedule ] && [ "$EVENT" != workflow_dispatch ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$FORCE" = true ] || [ -z "$PREV" ] || [ -n "$(git log --format=%h "$PREV..HEAD" -- . ':!CHANGELOG.md')" ]; then
+            echo "Changes since ${PREV:-the beginning}: releasing."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nothing changed since $PREV: no release this week."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     outputs:
-      version: ${{ steps.meta.outputs.version }}
+      version: ${{ steps.fw.outputs.version }}
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"   # the ESP32 tools support 3.10–3.14
-          cache: pip
-          cache-dependency-path: requirements-build.txt
-
-      - name: Cache PlatformIO packages
-        uses: actions/cache@v6
-        with:
-          path: ~/.platformio
-          key: pio-v2-${{ runner.os }}-py312-${{ hashFiles('platformio.ini', 'requirements-build.txt') }}
-          restore-keys: pio-v2-${{ runner.os }}-py312-
-
-      # The ESP32 platform runs a nested build with the PlatformIO Core in ~/.platformio/penv
-      # (it installs the pioarduino fork there). Install that same core there first and use it
-      # for the whole build, so both halves share one SCons.
-      - name: Install build tools
-        run: |
-          python -m venv ~/.platformio/penv
-          ~/.platformio/penv/bin/python -m pip install -q --upgrade pip
-          ~/.platformio/penv/bin/python -m pip uninstall -y -q platformio || true
-          ~/.platformio/penv/bin/python -m pip install -q -r requirements-build.txt
-          ~/.platformio/penv/bin/pio --version
-
-      - name: Build
-        run: ~/.platformio/penv/bin/pio run -e "$PIO_ENV"
-
-      - name: Collect the firmware files
-        id: meta
-        run: |
-          VER=$(sed -n "s/.*FW_VERSION='\"\([^\"]*\)\"'.*/\1/p" platformio.ini)
-          B=".pio/build/$PIO_ENV"
-          mkdir dist
-          # Names say how each file may be installed, to avoid mix-ups:
-          cp "$B/firmware.bin"         dist/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin  # Wi-Fi update page (or USB at 0x10000)
-          cp "$B/firmware.factory.bin" dist/xbloom-panel-doubleshot-FULL-USB-ONLY.bin       # USB only, at 0x0
-          (cd dist && sha256sum ./*.bin | sed "s#\./##" > SHA256SUMS.txt && cat SHA256SUMS.txt)
-          echo "version=${VER:-dev}" >> "$GITHUB_OUTPUT"
-
+      - id: fw
+        uses: ./.github/actions/build-firmware
       - uses: actions/upload-artifact@v7
         with:
           name: firmware
@@ -90,8 +87,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [check, build]
+    if: needs.check.outputs.release == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -108,9 +105,9 @@ jobs:
       - name: Write the changelog
         env:
           VER: ${{ needs.build.outputs.version }}
+          PREV: ${{ needs.check.outputs.prev }}
         run: |
           TAG="v${VER}-ds.${GITHUB_RUN_NUMBER}"
-          PREV=$(git describe --tags --abbrev=0 --match 'v*-ds.*' 2>/dev/null || true)
           if [ -n "$PREV" ]; then RANGE=("$PREV..HEAD"); else RANGE=(-n 30 HEAD); fi
           {
             echo "## ☕ What's new${PREV:+ since $PREV}"

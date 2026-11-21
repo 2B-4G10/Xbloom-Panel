@@ -1,7 +1,6 @@
-# Build tool for the firmware (used by CI and the installers; Dependabot keeps it current).
-# pioarduino is the PlatformIO Core fork the pioarduino ESP32 platform (55.03.39, see
-# platformio.ini) installs and runs for its nested build. It must use the same SCons as the
-# platform: 6.1.19 uses SCons 4.8.1 like 55.03.39; 6.2.x switches to 4.11.1, and mixing
-# them fails with "No module named SCons.Tool.FortranCommon". Move this together with the
-# platform version.
+# Build tool for the firmware, used by CI and the installers.
+# pioarduino is the PlatformIO Core fork the ESP32 platform in platformio.ini installs and
+# runs for its nested build. It must be the version that platform declares (same SCons);
+# mixing versions fails with "No module named SCons.Tool.FortranCommon".
+# Updated together with the platform by .github/workflows/essentials-bump.yml.
 pioarduino==6.1.19

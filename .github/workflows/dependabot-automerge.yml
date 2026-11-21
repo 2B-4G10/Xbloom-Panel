@@ -1,0 +1,33 @@
+# Merges Dependabot's update PRs automatically once their firmware build passes.
+# A failed build leaves the PR open for a look.
+name: Merge Dependabot updates
+
+on:
+  workflow_run:
+    workflows: ["Build & release firmware"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number,headRefOid,author \
+               --jq ".[] | select(.headRefOid == \"$SHA\" and .author.login == \"app/dependabot\") | .number")
+          if [ -z "$PR" ]; then echo "No open Dependabot PR at $SHA (already merged, or updated since)."; exit 0; fi
+          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
+          echo "✓ Merged #$PR; it will be in the next weekly release."

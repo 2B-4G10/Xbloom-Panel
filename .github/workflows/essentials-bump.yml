@@ -1,0 +1,86 @@
+# Weekly update of the build essentials that Dependabot can't track:
+# the pioarduino ESP32 platform (platformio.ini) and the matching pioarduino core
+# (requirements-build.txt). They must move together: the core must be the version the
+# platform itself declares, or the build breaks (mismatched SCons).
+#
+# The update is built first and only lands on main if the firmware builds; otherwise an issue
+# is opened and main is left untouched. Library versions (lvgl, NimBLE, ...) follow the
+# original project, via the daily upstream sync.
+name: Update build essentials
+
+on:
+  schedule:
+    - cron: "41 4 * * 1"   # weekly, Monday 04:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: writes-to-main
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Look for a newer ESP32 platform
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CUR=$(sed -n 's#^platform = .*/releases/download/\([^/]*\)/platform-espressif32.zip#\1#p' platformio.ini)
+          NEW=$(gh api repos/pioarduino/platform-espressif32/releases/latest --jq .tag_name)
+          echo "Current platform: $CUR · latest release: $NEW"
+          if [ -z "$CUR" ] || [ -z "$NEW" ] || [ "$CUR" = "$NEW" ] || [ "$(printf '%s\n%s\n' "$CUR" "$NEW" | sort -V | tail -1)" != "$NEW" ]; then
+            echo "✓ Platform is current."; echo "bump=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          CORE=$(curl -fsSL "https://raw.githubusercontent.com/pioarduino/platform-espressif32/$NEW/builder/penv_setup.py" \
+                 | sed -n 's/.*"pioarduino": *">=\([0-9][^"]*\)".*/\1/p' | head -1)
+          if [ -z "$CORE" ]; then echo "::error::Couldn't find the pioarduino core version platform $NEW needs."; exit 1; fi
+          echo "Platform $NEW needs pioarduino $CORE."
+          sed -i "s#/releases/download/$CUR/platform-espressif32.zip#/releases/download/$NEW/platform-espressif32.zip#" platformio.ini
+          sed -i "s#^pioarduino==.*#pioarduino==$CORE#" requirements-build.txt
+          git diff
+          { echo "cur=$CUR"; echo "new=$NEW"; echo "core=$CORE"; echo "bump=true"; } >> "$GITHUB_OUTPUT"
+
+      - name: Build with the new platform
+        id: build
+        if: steps.check.outputs.bump == 'true'
+        continue-on-error: true
+        uses: ./.github/actions/build-firmware
+
+      - name: Commit to main
+        if: steps.check.outputs.bump == 'true' && steps.build.outcome == 'success'
+        env:
+          CUR: ${{ steps.check.outputs.cur }}
+          NEW: ${{ steps.check.outputs.new }}
+          CORE: ${{ steps.check.outputs.core }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add platformio.ini requirements-build.txt
+          git commit -q -m "Update ESP32 platform $CUR → $NEW (pioarduino core $CORE)" \
+                        -m "Built successfully before committing. Release notes: https://github.com/pioarduino/platform-espressif32/releases/tag/$NEW"
+          git push -q origin HEAD:main && echo "✓ Updated; it will be in the next weekly release."
+
+      - name: Report an update that needs a hand
+        if: steps.check.outputs.bump == 'true' && steps.build.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CUR: ${{ steps.check.outputs.cur }}
+          NEW: ${{ steps.check.outputs.new }}
+          CORE: ${{ steps.check.outputs.core }}
+        run: |
+          if [ -n "$(gh issue list --state open --search "in:title ESP32 platform $NEW" --json number --jq '.[].number')" ]; then
+            echo "Already reported."; exit 0
+          fi
+          gh issue create --title "ESP32 platform $NEW doesn't build yet" --body "The weekly essentials update tried platform **$CUR → $NEW** with pioarduino core **$CORE**, but the firmware didn't build, so \`main\` was left on $CUR.
+
+          See the [workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) for the error, and the [platform release notes](https://github.com/pioarduino/platform-espressif32/releases/tag/$NEW). The update is tried again every week."
