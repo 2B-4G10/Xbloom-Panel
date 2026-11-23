@@ -29,7 +29,7 @@ uint32_t g_connect_started = 0;
 net::Ap g_aps[24];
 int g_n_aps = 0;
 bool g_pref_clock = true, g_pref_night = false;
-int g_pref_sleep = 3, g_pref_ccolor = 0;
+int g_pref_sleep = 3, g_pref_ccolor = 0, g_pref_lang = 0;
 volatile bool g_server_started = false, g_mdns = false, g_ntp = false;
 
 volatile bool g_page_enabled = false;
@@ -298,6 +298,7 @@ void begin() {
   g_pref_night = prefs.getBool("night", false);
   g_pref_sleep = prefs.getInt("sleep", 3);
   g_pref_ccolor = prefs.getInt("ccolor", 0);
+  g_pref_lang = prefs.getInt("lang", 0);
   String s = prefs.getString("ssid", ""), p = prefs.getString("pass", "");
   strlcpy(g_ssid, s.c_str(), sizeof g_ssid);
   strlcpy(g_pass, p.c_str(), sizeof g_pass);
@@ -364,5 +365,7 @@ int pref_sleep_min() { return g_pref_sleep; }
 void set_pref_sleep_min(int m) { g_pref_sleep = m; prefs.putInt("sleep", m); }
 int pref_clock_color() { return g_pref_ccolor; }
 void set_pref_clock_color(int c) { g_pref_ccolor = c; prefs.putInt("ccolor", c); }
+int pref_lang() { return g_pref_lang; }
+void set_pref_lang(int l) { g_pref_lang = l; prefs.putInt("lang", l); }
 
 }  // namespace net

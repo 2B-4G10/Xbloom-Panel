@@ -48,5 +48,7 @@ int pref_sleep_min();                // screen off (or clock) after this many id
 void set_pref_sleep_min(int m);
 int pref_clock_color();              // 0 white, 1 blue, 2 brown
 void set_pref_clock_color(int c);
+int pref_lang();                     // 0 English, 1 Arabic
+void set_pref_lang(int l);
 
 }  // namespace net

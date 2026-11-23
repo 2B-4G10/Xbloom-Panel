@@ -1,4 +1,5 @@
 // Desktop preview stand-in for the Wi-Fi / clock / update module.
+#include <stdlib.h>
 #include <string.h>
 #include "panel_net.h"
 namespace net {
@@ -41,4 +42,10 @@ int pref_sleep_min() { return sleep_m; }
 void set_pref_sleep_min(int m) { sleep_m = m; }
 int pref_clock_color() { return ccolor; }
 void set_pref_clock_color(int c) { ccolor = c; }
+static int lang_pref = -1;
+int pref_lang() {
+  if (lang_pref < 0) lang_pref = (getenv("SIM_LANG") && !strcmp(getenv("SIM_LANG"), "ar")) ? 1 : 0;
+  return lang_pref;
+}
+void set_pref_lang(int l) { lang_pref = l; }
 }  // namespace net

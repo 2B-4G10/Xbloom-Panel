@@ -34,3 +34,4 @@ Display/touch bring-up (src/main.cpp, include/LovyanGFX_Driver.h, boards/) follo
 LVGL (MIT), LovyanGFX (FreeBSD), NimBLE-Arduino (Apache-2.0), Arduino-ESP32 (LGPL-2.1).
 
 ArduinoJson (MIT). Inter font (SIL Open Font License 1.1), converted to LVGL fonts in src/fonts/.
+IBM Plex Sans Arabic (Copyright © 2017 IBM Corp., SIL Open Font License 1.1, full text in src/fonts/licenses/IBMPlexSansArabic-OFL.txt), converted to LVGL fonts in src/fonts/ar_*.c.

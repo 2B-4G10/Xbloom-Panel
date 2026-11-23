@@ -10,6 +10,8 @@
 #include "lvgl.h"
 #endif
 
+LV_FONT_DECLARE(ar_20b);
+
 #ifndef INTER_20B
 #define INTER_20B 1
 #endif
@@ -3161,7 +3163,7 @@ lv_font_t inter_20b = {
 #endif
     .dsc = &font_dsc,          /*The custom font data. Will be accessed by `get_glyph_bitmap/dsc` */
 #if LV_VERSION_CHECK(8, 2, 0) || LVGL_VERSION_MAJOR >= 9
-    .fallback = NULL,
+    .fallback = &ar_20b,   /* Arabic letters (src/fonts/ar_20b.c) */
 #endif
     .user_data = NULL,
 };

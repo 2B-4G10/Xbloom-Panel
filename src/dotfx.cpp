@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "ui_theme.h"
+#include "i18n.h"
 
 namespace dotfx {
 
@@ -182,6 +183,7 @@ lv_obj_t *clock_create(lv_obj_t *parent) {
   lv_obj_set_style_bg_color(bg, hexc(0x000000), 0);
   lv_obj_set_style_bg_opa(bg, LV_OPA_COVER, 0);
   lv_obj_remove_flag(bg, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_base_dir(bg, LV_BASE_DIR_LTR, 0);
   ck.time.blink = false;  // a steady colon: the clock only redraws when the minute changes
   ck.time.grid = 0.09f;
   ck.date.grid = 0.07f;
@@ -330,6 +332,8 @@ lv_obj_t *black_layer() {
   lv_obj_add_flag(l, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_remove_flag(l, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_flag(l, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(l, LV_OBJ_FLAG_USER_2);              // Arabic: keep the scene as drawn (see ui.cpp)
+  lv_obj_set_style_base_dir(l, LV_BASE_DIR_LTR, 0);
   return l;
 }
 
@@ -449,7 +453,7 @@ lv_obj_t *brew_btn(lv_obj_t *p, int x, int y, int w, int h, uint32_t bg, lv_obj_
   if (icon) *icon = ic;
   if (txt) {
     lv_obj_t *l = lv_label_create(b);
-    lv_label_set_text(l, txt);
+    lv_label_set_text(l, i18n::tr(txt));
     lv_obj_set_style_text_font(l, &inter_20b, 0);
     lv_obj_set_style_text_color(l, hexc(fg), 0);
     if (lbl) *lbl = l;
@@ -474,7 +478,7 @@ void build_brew() {
   const char *caps[2] = {"Scale", "Time"};
   for (int i = 0; i < 2; ++i) {
     bs_cap[i] = label(bs_layer, &inter_16, 0x8E8E93);
-    lv_label_set_text(bs_cap[i], caps[i]);
+    lv_label_set_text(bs_cap[i], i18n::tr(caps[i]));
     lv_obj_set_pos(bs_cap[i], X + i * 170, 262);
     bs_stat[i][0] = label(bs_layer, &inter_34b, 0xFFFFFF);
     bs_stat[i][1] = label(bs_layer, &inter_16, 0x9A9AA0);
@@ -537,7 +541,7 @@ void finish_play(const char *name, float grams, float ml, uint32_t ms) {
   in_on = false;
   lv_obj_add_flag(in_layer, LV_OBJ_FLAG_HIDDEN);
   brew_hide();
-  lv_label_set_text(fn_title, "Enjoy");
+  lv_label_set_text(fn_title, i18n::tr("Enjoy"));
   lv_label_set_text(fn_name, name);
   lv_obj_align(fn_title, LV_ALIGN_TOP_MID, 0, 290);
   lv_obj_align(fn_name, LV_ALIGN_TOP_MID, 0, 336);
@@ -548,7 +552,7 @@ void finish_play(const char *name, float grams, float ml, uint32_t ms) {
   const char *u[3] = {"g", "ml", "min"};
   for (int i = 0; i < 3; ++i) {
     lv_label_set_text(fn_stats[i][0], v[i]);
-    lv_label_set_text(fn_stats[i][1], u[i]);
+    lv_label_set_text(fn_stats[i][1], i18n::tr(u[i]));
     // number + unit, centred as a pair in each third, on a shared baseline
     lv_obj_update_layout(fn_stats[i][0]);
     lv_obj_update_layout(fn_stats[i][1]);
@@ -581,7 +585,7 @@ void brew_show(const char *name, void (*on_pause)(), void (*on_stop)()) {
 void brew_update(const BrewView &v) {
   if (!bs_on) return;
   bs_v = v;
-  lv_label_set_text(bs_title, v.paused ? "Paused" : v.pour_title);
+  lv_label_set_text(bs_title, i18n::tr(v.paused ? "Paused" : v.pour_title));
   lv_label_set_text(bs_sub, v.pour_sub);
   char b[24];
   snprintf(b, sizeof b, "%.0f", v.water_ml);
@@ -594,9 +598,9 @@ void brew_update(const BrewView &v) {
   lv_label_set_text(bs_stat[0][1], "g");
   snprintf(b, sizeof b, "%lu:%02lu", (unsigned long)(v.ms / 60000), (unsigned long)(v.ms / 1000 % 60));
   lv_label_set_text(bs_stat[1][0], b);
-  lv_label_set_text(bs_stat[1][1], "min");
+  lv_label_set_text(bs_stat[1][1], i18n::tr("min"));
   for (int i = 0; i < 2; ++i) place_pair(bs_stat[i][0], bs_stat[i][1], 440 + i * 170, 326);
-  lv_label_set_text(bs_pause_lbl, v.paused ? "RESUME" : "PAUSE");
+  lv_label_set_text(bs_pause_lbl, i18n::tr(v.paused ? "RESUME" : "PAUSE"));
   lv_label_set_text(bs_pause_icon, v.paused ? LV_SYMBOL_PLAY : LV_SYMBOL_PAUSE);
 }
 

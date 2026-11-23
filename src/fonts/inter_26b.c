@@ -10,6 +10,8 @@
 #include "lvgl.h"
 #endif
 
+LV_FONT_DECLARE(ar_26b);
+
 #ifndef INTER_26B
 #define INTER_26B 1
 #endif
@@ -4583,7 +4585,7 @@ lv_font_t inter_26b = {
 #endif
     .dsc = &font_dsc,          /*The custom font data. Will be accessed by `get_glyph_bitmap/dsc` */
 #if LV_VERSION_CHECK(8, 2, 0) || LVGL_VERSION_MAJOR >= 9
-    .fallback = NULL,
+    .fallback = &ar_26b,   /* Arabic letters (src/fonts/ar_26b.c) */
 #endif
     .user_data = NULL,
 };

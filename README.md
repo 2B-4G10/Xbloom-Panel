@@ -123,6 +123,7 @@ Put these before the command. On a Mac: `XBP_NO_BACKUP=1 bash …`. On Windows, 
 1. **Settings → Wi-Fi:** pick your network.
 2. **Settings → xBloom account:** sign in with your xBloom app email and password.
 3. Turn on the xBloom Studio. The panel connects by itself over Bluetooth.
+4. **Settings → Language:** English or العربية (Arabic, right-to-left). The panel restarts in the new language.
 
 ---
 

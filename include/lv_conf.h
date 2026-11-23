@@ -15,6 +15,11 @@
 #define LV_FONT_MONTSERRAT_48 1
 #define LV_FONT_DEFAULT &lv_font_montserrat_16
 
+/* Arabic: letter joining (shaping) and right-to-left text */
+#define LV_USE_BIDI 1
+#define LV_BIDI_BASE_DIR_DEF LV_BASE_DIR_LTR
+#define LV_USE_ARABIC_PERSIAN_CHARS 1
+
 /* QR codes on the Double Shot page (store + WhatsApp links) */
 #define LV_USE_QRCODE 1
 

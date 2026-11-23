@@ -19,9 +19,12 @@
 #include "panel_net.h"
 #include "ui_theme.h"
 #include "dotfx.h"
+#include "i18n.h"
 
 using th::hex;
 using namespace th;
+using i18n::tr;
+LV_FONT_DECLARE(ar_16);
 
 namespace {
 
@@ -85,10 +88,100 @@ lv_timer_t *toast_timer;
 // redraw that area, and redraws compete with the display for PSRAM bandwidth
 // (redrawing the clock and status bar 5x a second caused the line glitches).
 void set_text(lv_obj_t *l, const char *t) {
+  t = tr(t);  // the Arabic text when Arabic is on (anything without a translation shows as is)
   const char *cur = lv_label_get_text(l);
   if (cur && t && strcmp(cur, t) == 0) return;
   lv_label_set_text(l, t);
 }
+// ----------------------------------------------------------------------------
+// Right-to-left (Arabic). Screens are laid out with left-to-right coordinates.
+// With Arabic on, every object is mirrored once, just before it is first drawn:
+// its anchor moves to the other side (left <-> right) and its x offset changes
+// sign, so a label 24 px from the left edge ends up 24 px from the right edge and
+// still grows the right way when its text changes. Labels, flex rows, switches
+// and drop-downs follow the screens' RTL base direction by themselves.
+// ----------------------------------------------------------------------------
+constexpr lv_obj_flag_t RTL_DONE = LV_OBJ_FLAG_USER_1;  // already mirrored
+constexpr lv_obj_flag_t RTL_KEEP = LV_OBJ_FLAG_USER_2;  // keep as built (number + unit pairs, keyboard, animations)
+bool rtl = false;
+
+lv_align_t mirror_align(lv_align_t a) {
+  switch (a) {
+    case LV_ALIGN_DEFAULT:
+    case LV_ALIGN_TOP_LEFT: return LV_ALIGN_TOP_RIGHT;
+    case LV_ALIGN_TOP_RIGHT: return LV_ALIGN_TOP_LEFT;
+    case LV_ALIGN_LEFT_MID: return LV_ALIGN_RIGHT_MID;
+    case LV_ALIGN_RIGHT_MID: return LV_ALIGN_LEFT_MID;
+    case LV_ALIGN_BOTTOM_LEFT: return LV_ALIGN_BOTTOM_RIGHT;
+    case LV_ALIGN_BOTTOM_RIGHT: return LV_ALIGN_BOTTOM_LEFT;
+    default: return a;  // centred anchors stay; only x flips
+  }
+}
+
+bool plain_obj(const lv_obj_t *o) { return lv_obj_get_class(o) == &lv_obj_class; }
+
+void rtl_settle(lv_obj_t *o) {
+  if (!rtl || lv_obj_has_flag(o, RTL_DONE) || lv_obj_has_flag(o, RTL_KEEP)) return;
+  lv_obj_add_flag(o, RTL_DONE);
+  lv_obj_t *p = lv_obj_get_parent(o);
+  if (p && lv_obj_get_style_layout(p, 0) == LV_LAYOUT_NONE) {  // flex rows reverse by themselves
+    const lv_align_t a = (lv_align_t)lv_obj_get_style_align(o, 0), m = mirror_align(a);
+    const int32_t x = lv_obj_get_style_x(o, 0);
+    if (m != a) lv_obj_set_style_align(o, m, 0);
+    if (x != 0 && !LV_COORD_IS_PCT(x)) lv_obj_set_style_x(o, -x, 0);
+  }
+  if (lv_obj_check_type(o, &lv_label_class)) {
+    // Each label reads in the direction of its own text: Arabic right-to-left, while
+    // "9:25" or "80ml" stay left-to-right (an RTL paragraph would show "25:9", "ml80").
+    lv_obj_set_style_base_dir(o, LV_BASE_DIR_AUTO, 0);
+    const lv_text_align_t ta = (lv_text_align_t)lv_obj_get_style_text_align(o, 0);
+    if (ta == LV_TEXT_ALIGN_LEFT) lv_obj_set_style_text_align(o, LV_TEXT_ALIGN_RIGHT, 0);
+    else if (ta == LV_TEXT_ALIGN_RIGHT) lv_obj_set_style_text_align(o, LV_TEXT_ALIGN_LEFT, 0);
+    const char *t = lv_label_get_text(o);
+    if (!strcmp(t, LV_SYMBOL_LEFT)) lv_label_set_text(o, LV_SYMBOL_RIGHT);       // back
+    else if (!strcmp(t, LV_SYMBOL_RIGHT)) lv_label_set_text(o, LV_SYMBOL_LEFT);  // "more" chevrons
+  }
+}
+
+// Mirror an object and everything in it. Only plain containers are entered: the
+// children of widgets (a text field's label, ...) are placed by the widget itself.
+void rtl_tree(lv_obj_t *o) {
+  if (lv_obj_has_flag(o, RTL_KEEP)) return;
+  rtl_settle(o);
+  if (!plain_obj(o)) return;
+  for (uint32_t i = 0, n = lv_obj_get_child_count(o); i < n; ++i) rtl_tree(lv_obj_get_child(o, i));
+}
+
+// Runs right before every redraw, so new objects are mirrored before they are seen.
+void rtl_sweep(lv_event_t *) {
+  rtl_tree(lv_screen_active());
+  lv_obj_t *top = lv_layer_top();
+  for (uint32_t i = 0, n = lv_obj_get_child_count(top); i < n; ++i) {
+    lv_obj_t *c = lv_obj_get_child(top, i);
+    if (plain_obj(c)) rtl_tree(c);  // drop-down lists place themselves
+  }
+}
+
+// lv_obj_set_x for an object built with a left anchor: in Arabic, from the right.
+void set_x_dir(lv_obj_t *o, int32_t x) {
+  if (rtl) {
+    rtl_settle(o);
+    x = -x;
+  }
+  lv_obj_set_x(o, x);
+}
+
+// lv_obj_align_to beside `base`; OUT_LEFT and OUT_RIGHT swap sides in Arabic.
+void align_beside(lv_obj_t *o, lv_obj_t *base, lv_align_t a, int32_t x, int32_t y) {
+  if (rtl) {
+    rtl_settle(base);
+    rtl_settle(o);
+    a = a == LV_ALIGN_OUT_RIGHT_MID ? LV_ALIGN_OUT_LEFT_MID : a == LV_ALIGN_OUT_LEFT_MID ? LV_ALIGN_OUT_RIGHT_MID : a;
+    x = -x;
+  }
+  lv_obj_align_to(o, base, a, x, y);
+}
+
 void set_text_color(lv_obj_t *o, lv_color_t c, lv_style_selector_t sel) {
   if (sel == 0 && lv_color_eq(lv_obj_get_style_text_color(o, LV_PART_MAIN), c)) return;
   lv_obj_set_style_text_color(o, c, sel);
@@ -158,6 +251,11 @@ void baseline_align(lv_obj_t *l, lv_align_t align, int x, int from_bottom) {
 
 // Put `l` to the left (or right) of `ref` with the two baselines lined up.
 void baseline_next_to(lv_obj_t *l, lv_obj_t *ref, bool left, int gap) {
+  if (rtl && !lv_obj_has_flag(l, RTL_KEEP)) {  // Arabic: the other side, placed where `ref` really is
+    rtl_settle(ref);
+    rtl_settle(l);
+    left = !left;
+  }
   const lv_font_t *fl = lv_obj_get_style_text_font(l, 0);
   const lv_font_t *fr = lv_obj_get_style_text_font(ref, 0);
   lv_obj_update_layout(ref);
@@ -204,6 +302,7 @@ void show_toast(const char *msg) {
 
 lv_obj_t *new_screen(uint32_t bg) {
   lv_obj_t *s = lv_obj_create(nullptr);
+  if (rtl) lv_obj_set_style_base_dir(s, LV_BASE_DIR_RTL, 0);
   lv_obj_set_style_bg_color(s, hex(bg), 0);
   lv_obj_remove_flag(s, LV_OBJ_FLAG_SCROLLABLE);
   return s;
@@ -314,10 +413,18 @@ void heart_color(lv_obj_t *h, uint32_t col) {
   for (uint32_t i = 0; i < lv_obj_get_child_count(h); ++i) lv_obj_set_style_bg_color(lv_obj_get_child(h, i), hex(col), 0);
 }
 
+// A pour's name on screen: its own name, or "Bloom" / "Pour N" in the panel's language
+// (library::pour_name() gives the English default that is saved with the recipe).
+void shown_pour_name(const PanelRecipe &p, int i, char *out, size_t n) {
+  if (p.pour_names[i][0]) strlcpy(out, p.pour_names[i], n);
+  else if (i == 0) strlcpy(out, tr("Bloom"), n);
+  else snprintf(out, n, tr("Pour %d"), i + 1);
+}
+
 double ratio_of(const xb::Recipe &r) { return round(r.total_water() / r.dose_g * 10) / 10; }
 
 void recipe_line(const xb::Recipe &r, char *buf, size_t n) {
-  snprintf(buf, n, "1:%g-%.0fml   |   %gg   |   %d Pours", ratio_of(r), r.total_water(), r.dose_g, r.n_pours);
+  snprintf(buf, n, tr("1:%g-%.0fml   |   %gg   |   %d Pours"), ratio_of(r), r.total_water(), r.dose_g, r.n_pours);
 }
 
 // Pastel recipe tile: label top-left, cup bottom-left, big pour count bleeding
@@ -373,6 +480,7 @@ void card_event(lv_event_t *e) {
   lv_obj_get_coords(c.card, &a);
   double r = (double)(p.x - a.x1 - 8) / (lv_area_get_width(&a) - 16);
   r = fmax(0, fmin(1, r));
+  if (rtl) r = 1 - r;  // the fill grows from the right
   const double v = c.min + round(r * (c.max - c.min) / c.step) * c.step;
   const bool released = lv_event_get_code(e) == LV_EVENT_RELEASED;
   if (v != c.v || released) {
@@ -616,7 +724,7 @@ void build_recipe_list() {
 void set_seg(int s) {
   seg = s;
   const int third = (W - 2 * M - 8) / 3;
-  lv_obj_set_x(seg_pill, 4 + s * third);
+  set_x_dir(seg_pill, 4 + s * third);
   for (int i = 0; i < 3; ++i) set_text_color(seg_lbl[i], hex(i == s ? 0x000000 : MUTED), 0);
   build_recipe_list();
 }
@@ -709,7 +817,7 @@ lv_obj_t *toggle(lv_obj_t *row_obj, bool on, lv_event_cb_t cb) {
 // A compact dark drop-down list on the right of a settings row.
 lv_obj_t *dropdown(lv_obj_t *row_obj, const char *options, lv_event_cb_t cb) {
   lv_obj_t *d = lv_dropdown_create(row_obj);
-  lv_dropdown_set_options_static(d, options);
+  lv_dropdown_set_options_static(d, tr(options));
   lv_obj_set_size(d, 140, 38);
   lv_obj_align(d, LV_ALIGN_RIGHT_MID, -12, 0);
   lv_obj_set_style_bg_color(d, hex(0x2C2C2E), 0);
@@ -760,6 +868,11 @@ void sub_header(lv_obj_t *scr, const char *title, lv_event_cb_t back, lv_obj_t *
 
 void open_wifi(lv_event_t * = nullptr);
 void open_update(lv_event_t * = nullptr);
+void restart_panel() {
+#ifndef UI_SIM
+  ESP.restart();
+#endif
+}
 void back_to_settings(lv_event_t *) { load(scr_home, Anim::PopRight); }
 
 void build_settings_page(lv_obj_t *page) {
@@ -804,6 +917,20 @@ void build_settings_page(lv_obj_t *page) {
   lv_obj_t *c3 = section(page, "ABOUT", M, y0 + 24 + 4 * rh + G, cw, 1, rh);
   row(c3, 0, rh, "Machine", &st_machine_val, nullptr);
   set_text(st_machine_val, "Not connected");
+
+  lv_obj_t *c4 = section(page, "LANGUAGE", x2, y0 + 24 + 4 * rh + G, cw, 1, rh);
+  lv_obj_t *rl = row(c4, 0, rh, "Language", nullptr, nullptr);
+  lv_obj_t *dl = dropdown(rl, "English\n" "\xD8\xA7\xD9\x84\xD8\xB9\xD8\xB1\xD8\xA8\xD9\x8A\xD8\xA9", [](lv_event_t *e) {
+    const int l = (int)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(e));
+    if (l == net::pref_lang()) return;
+    net::set_pref_lang(l);  // the screens are rebuilt in the new language after a restart
+    show_toast(l == 1 ? "\xD8\xAC\xD8\xA7\xD8\xB1\xD9\x8D \xD8\xA5\xD8\xB9\xD8\xA7\xD8\xAF\xD8\xA9 "
+                        "\xD8\xA7\xD9\x84\xD8\xAA\xD8\xB4\xD8\xBA\xD9\x8A\xD9\x84..."
+                      : "Restarting...");
+    lv_timer_t *t = lv_timer_create([](lv_timer_t *) { restart_panel(); }, 1200, nullptr);
+    lv_timer_set_repeat_count(t, 1);
+  });
+  lv_dropdown_set_selected(dl, net::pref_lang() == 1 ? 1 : 0);
 }
 
 void format_clock(const struct tm &t, char *hm, size_t n);
@@ -824,7 +951,7 @@ void refresh_sync_row() {
   localtime_r(&ls, &t);
   char hm[12], b[24];
   format_clock(t, hm, sizeof hm);
-  snprintf(b, sizeof b, "Synced %s", hm);
+  snprintf(b, sizeof b, tr("Synced %s"), hm);
   set_text(st_sync_val, b);
 }
 
@@ -879,7 +1006,7 @@ void refresh_wifi_status() {
   switch (net::state()) {
     case net::Wifi::Connected:
       title = net::ssid();
-      snprintf(buf, sizeof buf, "Connected\n%s", net::ip());
+      snprintf(buf, sizeof buf, tr("Connected\n%s"), net::ip());
       sub = buf;
       break;
     case net::Wifi::Connecting:
@@ -949,10 +1076,40 @@ void te_submit(lv_event_t *) {
   if (te_done) te_done(buf);
 }
 
+// The on-screen keyboard's Latin layouts (LVGL's defaults, minus the Arabic page key
+// that LVGL adds once Arabic letter shaping is enabled).
+#define KB_K(w) (LV_BUTTONMATRIX_CTRL_POPOVER | (w))
+#define KB_FN (LV_BUTTONMATRIX_CTRL_NO_REPEAT | LV_BUTTONMATRIX_CTRL_CLICK_TRIG | LV_BUTTONMATRIX_CTRL_CHECKED)
+#define KB_HI LV_BUTTONMATRIX_CTRL_CHECKED
+const char *KB_LC[] = {"1#", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", LV_SYMBOL_BACKSPACE, "\n",
+                             "ABC", "a", "s", "d", "f", "g", "h", "j", "k", "l", LV_SYMBOL_NEW_LINE, "\n",
+                             "_", "-", "z", "x", "c", "v", "b", "n", "m", ".", ",", ":", "\n",
+                             LV_SYMBOL_KEYBOARD, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, LV_SYMBOL_OK, ""};
+const char *KB_UC[] = {"1#", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", LV_SYMBOL_BACKSPACE, "\n",
+                             "abc", "A", "S", "D", "F", "G", "H", "J", "K", "L", LV_SYMBOL_NEW_LINE, "\n",
+                             "_", "-", "Z", "X", "C", "V", "B", "N", "M", ".", ",", ":", "\n",
+                             LV_SYMBOL_CLOSE, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, LV_SYMBOL_OK, ""};
+const char *KB_SPEC[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", LV_SYMBOL_BACKSPACE, "\n",
+                               "abc", "+", "&", "/", "*", "=", "%", "!", "?", "#", "<", ">", "\n",
+                               "\\", "@", "$", "(", ")", "{", "}", "[", "]", ";", "\"", "'", "\n",
+                               LV_SYMBOL_KEYBOARD, LV_SYMBOL_LEFT, " ", LV_SYMBOL_RIGHT, LV_SYMBOL_OK, ""};
+const lv_buttonmatrix_ctrl_t KB_CTRL[] = {
+    KB_FN | 5, KB_K(4), KB_K(4), KB_K(4), KB_K(4), KB_K(4), KB_K(4), KB_K(4), KB_K(4), KB_K(4), KB_K(4), KB_HI | 7,
+    KB_FN | 6, KB_K(3), KB_K(3), KB_K(3), KB_K(3), KB_K(3), KB_K(3), KB_K(3), KB_K(3), KB_K(3), KB_HI | 7,
+    KB_HI | KB_K(1), KB_HI | KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1),
+    KB_HI | KB_K(1), KB_HI | KB_K(1), KB_HI | KB_K(1),
+    KB_FN | 2, KB_HI | 2, 6, KB_HI | 2, KB_FN | 2};
+const lv_buttonmatrix_ctrl_t KB_CTRL_SPEC[] = {
+    KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_HI | 2,
+    KB_FN | 2, KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1),
+    KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1), KB_K(1),
+    KB_FN | 2, KB_HI | 2, 6, KB_HI | 2, KB_FN | 2};
+
 void build_text_entry() {
   scr_pass = new_screen(BG);
   sub_header(scr_pass, "", [](lv_event_t *) { load(te_back_to, Anim::PopRight); }, &pw_title);
   pw_ta = lv_textarea_create(scr_pass);
+  lv_obj_set_style_base_dir(pw_ta, LV_BASE_DIR_LTR, 0);  // emails, passwords, Wi-Fi names
   lv_textarea_set_one_line(pw_ta, true);
   lv_obj_set_pos(pw_ta, M, 100);
   lv_obj_set_style_text_font(pw_ta, &inter_20, 0);
@@ -976,6 +1133,20 @@ void build_text_entry() {
   te_action_lbl = lv_obj_get_child(act, 0);
 
   lv_obj_t *kb = lv_keyboard_create(scr_pass);
+  lv_obj_set_style_base_dir(kb, LV_BASE_DIR_LTR, 0);  // keys keep their places in Arabic too
+  lv_obj_add_flag(kb, RTL_KEEP);
+  if (rtl) {
+    // Arabic: LVGL's keyboard has an Arabic letters page (the "أب" key); its key font
+    // gets the Arabic letters as a fallback.
+    static lv_font_t kb_font = lv_font_montserrat_16;
+    kb_font.fallback = &ar_16;
+    lv_obj_set_style_text_font(kb, &kb_font, 0);
+  } else {
+    // English: the Latin layouts without the Arabic page key.
+    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, KB_LC, KB_CTRL);
+    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_UPPER, KB_UC, KB_CTRL);
+    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_SPECIAL, KB_SPEC, KB_CTRL_SPEC);
+  }
   lv_obj_set_size(kb, W, H - 176);
   lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_keyboard_set_textarea(kb, pw_ta);
@@ -1002,7 +1173,7 @@ void open_text_entry(const char *title, const char *initial, const char *placeho
   set_text(pw_title, title);
   lv_textarea_set_max_length(pw_ta, max_len);
   lv_textarea_set_text(pw_ta, initial);
-  lv_textarea_set_placeholder_text(pw_ta, placeholder);
+  lv_textarea_set_placeholder_text(pw_ta, tr(placeholder));
   lv_textarea_set_password_mode(pw_ta, secret);
   set_text(pw_show_lbl, "Show");
   set_text(te_action_lbl, action);
@@ -1016,7 +1187,7 @@ void open_text_entry(const char *title, const char *initial, const char *placeho
 void open_password(const char *ssid) {
   strlcpy(pw_ssid, ssid, sizeof pw_ssid);
   char buf[64];
-  snprintf(buf, sizeof buf, "Join \"%s\"", ssid);
+  snprintf(buf, sizeof buf, tr("Join \"%s\""), ssid);
   open_text_entry(buf, "", "Password", true, "Join", scr_wifi, [](const char *t) {
     net::join(pw_ssid, t);
     refresh_wifi_status();
@@ -1037,7 +1208,7 @@ void refresh_update() {
     set_text(up_steps, "On your phone or computer (same Wi-Fi), open:");
     snprintf(buf, sizeof buf, "http://%s", net::hostname());
     set_text(up_url, buf);
-    snprintf(buf, sizeof buf, "or  http://%s     then choose the update file.", net::ip());
+    snprintf(buf, sizeof buf, tr("or  http://%s     then choose the update file."), net::ip());
     set_text(up_ip, buf);
   }
   const net::Upd u = net::update_state();
@@ -1046,12 +1217,12 @@ void refresh_update() {
   switch (u) {
     case net::Upd::Idle: set_text(up_status, online ? "Waiting for the file..." : ""); break;
     case net::Upd::Receiving:
-      snprintf(buf, sizeof buf, "Installing... %d%%   Keep the panel powered.", net::update_progress());
+      snprintf(buf, sizeof buf, tr("Installing... %d%%   Keep the panel powered."), net::update_progress());
       set_text(up_status, buf);
       break;
     case net::Upd::Done: set_text(up_status, "Installed. Restarting..."); break;
     case net::Upd::Failed:
-      snprintf(buf, sizeof buf, "Failed: %s", net::update_error());
+      snprintf(buf, sizeof buf, tr("Failed: %s"), net::update_error());
       set_text(up_status, buf);
       break;
   }
@@ -1068,7 +1239,7 @@ void build_update() {
   });
   lv_obj_t *card = box(scr_update, M, 96, W - 2 * M, H - M - 96, 0x1C1C1E, R_SM);
   char buf[48];
-  snprintf(buf, sizeof buf, "Installed version %s", FW_VERSION);
+  snprintf(buf, sizeof buf, tr("Installed version %s"), FW_VERSION);
   lv_obj_t *v = text(card, buf, &inter_20b, hex(TEXT));
   lv_obj_set_pos(v, 24, 22);
   up_steps = text(card, "", &inter_20, hex(SUB));
@@ -1110,6 +1281,7 @@ uint32_t clock_color_pref() {
 
 void build_clock() {
   clock_layer = dotfx::clock_create(lv_layer_top());
+  lv_obj_add_flag(clock_layer, RTL_KEEP);
   show(clock_layer, false);
 }
 
@@ -1393,6 +1565,8 @@ void build_detail() {
     lv_obj_align(d_stats[i][0], LV_ALIGN_TOP_MID, 0, 12);
     d_stats[i][1] = text(col, "", &inter_26b, lv_color_lighten(hex(bg), 40));
     d_stat_unit[i] = text(col, "", &inter_16, hex(SUB));
+    lv_obj_add_flag(d_stats[i][1], RTL_KEEP);  // number + unit, centred by set_stat()
+    lv_obj_add_flag(d_stat_unit[i], RTL_KEEP);
   }
 
   // ---- START pill + stop circle ----
@@ -1455,8 +1629,7 @@ void build_detail() {
       if (i == 0) strcpy(nm, "Bloom");
       else snprintf(nm, sizeof nm, "P%d", i + 1);
     } else {
-      char tmp[24];
-      strlcpy(nm, library::pour_name(p, i, tmp), sizeof nm);
+      shown_pour_name(p, i, nm, sizeof nm);
     }
     centered(nm, narrow ? &inter_16 : &inter_20, hex(TEXT), base + 46);
     snprintf(buf, sizeof buf, po.agitate_after || po.agitate_before ? "%ds ~" : "%ds", po.pause_s);
@@ -1747,6 +1920,8 @@ void build_scale() {
   lv_obj_t *inner = box(card, 6, 6, MOD_LEFT_W - 12, MOD_BOTTOM - MOD_TOP - 12, SCALE_FILL, R - 6);
   sc_value = text(inner, "0.0", &inter_96_num, hex(0x5FB5A4));
   sc_unit = text(inner, "g", &inter_34b, hex(0x5FB5A4));
+  lv_obj_add_flag(sc_value, RTL_KEEP);  // number + unit, centred by render_scale()
+  lv_obj_add_flag(sc_unit, RTL_KEEP);
   const char *u[3] = {"g", "oz", "ml"};
   const int bh = 60, bgap = 12;
   for (int i = 0; i < 3; ++i) {
@@ -2236,9 +2411,9 @@ void refresh_account() {
     const time_t ls = cloud::last_sync();
     if (ls && localtime_r(&ls, &t)) {
       int h = t.tm_hour % 12;
-      snprintf(when, sizeof when, "at %d:%02d %s", h ? h : 12, t.tm_min, t.tm_hour < 12 ? "AM" : "PM");
+      snprintf(when, sizeof when, tr("at %d:%02d %s"), h ? h : 12, t.tm_min, tr(t.tm_hour < 12 ? "AM" : "PM"));
     }
-    snprintf(buf, sizeof buf, "%d created  |  %d shared\nLast synced %s%s", mine, shared, when,
+    snprintf(buf, sizeof buf, tr("%d created  |  %d shared\nLast synced %s%s"), mine, shared, when,
              cloud::busy() ? "  (syncing...)" : "");
     set_text(ac_sub, buf);
     set_text(ac_primary_lbl, cloud::busy() ? "Syncing..." : "Sync now");
@@ -2317,13 +2492,13 @@ void handle_cloud(const cloud::Event &e) {
       break;
     case cloud::Ev::PushFailed: {
       char buf[160];
-      snprintf(buf, sizeof buf, "Saved on the panel, but not to your account: %s", e.msg);
+      snprintf(buf, sizeof buf, tr("Saved on the panel, but not to your account: %s"), e.msg);
       show_toast(buf);
       break;
     }
     case cloud::Ev::RemoveFailed: {
       char buf[160];
-      snprintf(buf, sizeof buf, "Couldn't delete it from your account: %s", e.msg);
+      snprintf(buf, sizeof buf, tr("Couldn't delete it from your account: %s"), e.msg);
       show_toast(buf);
       break;
     }
@@ -2366,11 +2541,16 @@ void set_link(LinkState s, const char *name) {
   // one row:  XBLOOM 381 >   ● Connected
   baseline_next_to(home_chev, home_name, false, 8);
   lv_obj_update_layout(home_chev);
-  lv_obj_align_to(home_dot, home_chev, LV_ALIGN_OUT_RIGHT_MID, 22, 0);
-  lv_obj_align_to(home_spin, home_chev, LV_ALIGN_OUT_RIGHT_MID, 19, 0);
+  align_beside(home_dot, home_chev, LV_ALIGN_OUT_RIGHT_MID, 22, 0);
+  align_beside(home_spin, home_chev, LV_ALIGN_OUT_RIGHT_MID, 19, 0);
   baseline_next_to(home_status, home_name, false, 0);
   lv_obj_update_layout(home_dot);
-  lv_obj_set_x(home_status, lv_obj_get_x(home_dot) + 10 + 8);
+  if (rtl) {
+    lv_obj_update_layout(home_status);
+    lv_obj_set_x(home_status, lv_obj_get_x(home_dot) - 8 - lv_obj_get_width(home_status));
+  } else {
+    lv_obj_set_x(home_status, lv_obj_get_x(home_dot) + 10 + 8);
+  }
   set_text_color(sb_bt, hex(ok ? TEXT : MUTED), 0);
   if (!ok) {
     if (flow != Flow::Idle) { flow = Flow::Idle; active = 0; dotfx::brew_hide(); intro_for = 0; }
@@ -2400,13 +2580,12 @@ void update_brew_scene() {
   char title[32], sub[48];
   const int i = pour_idx >= 0 && pour_idx < p->r.n_pours ? pour_idx : -1;
   if (i < 0) {
-    strcpy(title, "Starting");
-    snprintf(sub, sizeof sub, "%d pours  |  %.0f ml", p->r.n_pours, p->r.total_water());
+    strlcpy(title, tr("Starting"), sizeof title);
+    snprintf(sub, sizeof sub, tr("%d pours  |  %.0f ml"), p->r.n_pours, p->r.total_water());
   } else {
-    char nm[24];
-    strlcpy(title, library::pour_name(*p, i, nm), sizeof title);
+    shown_pour_name(*p, i, title, sizeof title);
     const xb::Pour &po = p->r.pours[i];
-    snprintf(sub, sizeof sub, "%.0f\xC2\xB0" "C  |  %s  |  %d of %d", po.temp_c, pattern_name(po.pattern), i + 1, p->r.n_pours);
+    snprintf(sub, sizeof sub, tr("%.0f\xC2\xB0" "C  |  %s  |  %d of %d"), po.temp_c, tr(pattern_name(po.pattern)), i + 1, p->r.n_pours);
   }
   v.pour_title = title;
   v.pour_sub = sub;
@@ -2528,6 +2707,12 @@ void splash() {
 }
 
 void begin() {
+  i18n::set_lang(net::pref_lang() == 1 ? i18n::Lang::AR : i18n::Lang::EN);
+  rtl = i18n::rtl();
+  if (rtl) {
+    lv_obj_set_style_base_dir(lv_layer_top(), LV_BASE_DIR_RTL, 0);
+    lv_display_add_event_cb(lv_display_get_default(), rtl_sweep, LV_EVENT_REFR_START, nullptr);
+  }
   storage::begin();
   load_lib();
   build_home_screen();
