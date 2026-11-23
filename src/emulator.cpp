@@ -384,9 +384,22 @@ lv_point_t centre(lv_obj_t *o) {
   return {(a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2};
 }
 
+// What the screen shows, for a failed step: every visible label.
+void list_labels(lv_obj_t *o) {
+  if (lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) return;
+  if (lv_obj_check_type(o, &lv_label_class) && lv_obj_is_visible(o)) {
+    lv_area_t a;
+    lv_obj_get_coords(o, &a);
+    Serial.printf("[emu]   label (%d,%d) \"%s\"\n", (int)a.x1, (int)a.y1, lv_label_get_text(o));
+  }
+  for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) list_labels(lv_obj_get_child(o, i));
+}
+
 void fail(const char *what, const char *s) {
   failed++;
-  Serial.printf("[emu] FAIL %s \"%s\"\n", what, s ? s : "");
+  Serial.printf("[emu] FAIL %s \"%s\" (looking for \"%s\")\n", what, s ? s : "", s ? shown(s) : "");
+  list_labels(lv_layer_top());
+  list_labels(lv_screen_active());
 }
 void pass(const char *what, const char *s) {
   passed++;
