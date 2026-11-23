@@ -1,54 +1,136 @@
 # Changelog
 
-All the good stuff, newest first. ☕
+All the good stuff, newest first. ☕ Every version is on the [releases page](https://github.com/2B-4G10/Xbloom-Panel/releases).
 
-## 🍓 [4.1.0](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.0-ds.17) · 2026-11-23 · build 17
+## ☕ [4.1.0 · build 17](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.0-ds.17) · 2026-11-23
 
-### 😋 Emoji, everywhere
-Every emoji now shows in full colour, on every screen: smileys, hearts, skin tones 👍🏽, families 👨‍👩‍👧‍👦, jobs 👩🏽‍💻, keycaps 1️⃣ and flags 🇸🇦. Give a recipe an emoji name and the panel shows it just like your phone does, and saves it exactly as you typed it.
+> [!TIP]
+> **Highlights:** 😋 colour emoji everywhere · ☕ five new starter recipes · 🧪 every release now tested in an emulator
 
-### ☕ Five new starter recipes
-Find them under **Recipes → Starter**, next to Daily Pour Over, Light Roast and Dark Roast:
+### ✨ New
+#### 😋 Emoji, everywhere
+Every emoji shows in full colour, on every screen, just like on your phone:
+- 😀 smileys and ❤️ hearts
+- 👍🏽 skin tones and 👨‍👩‍👧‍👦 families
+- 👩🏽‍💻 jobs, 1️⃣ keycaps and 🇸🇦 flags (4,012 in all)
 
-| | Recipe | Best for |
-|---|---|---|
-| 🍓 | **Berry Bomb** | Fruity naturals: hot, fine and in small pours to lift the berries |
-| 🍫 | **Chocolate Hug** | Chocolatey medium-dark beans: cooler and coarser for a round, heavy cup |
-| 🍯 | **Honey Morning** | Washed medium roasts: a long bloom and a slow middle pour for sweetness |
-| 🧊 | **Iced Sunrise** | Iced pour over: brewed strong onto about 120 g of ice |
-| 😋 | **Sweet Spot** | Any beans, any day: a balanced 1:16 in four even pours |
+Give a recipe an emoji name and the panel saves it exactly as you typed it.
 
-### 🌐 Arabic polish
-The temperature and pour pattern under each pour on the recipe page are no longer cut off.
+#### ☕ Five new starter recipes
+Under **Recipes → Starter**, next to Daily Pour Over, Light Roast and Dark Roast:
+
+| | Recipe | Best for | Dose · Water |
+|---|---|---|---|
+| 🍓 | **Berry Bomb** | Fruity naturals: hot, fine, small pours to lift the berries | 15 g · 240 ml |
+| 🍫 | **Chocolate Hug** | Chocolatey medium-dark beans: a round, heavy cup | 16 g · 240 ml |
+| 🍯 | **Honey Morning** | Washed medium roasts: long bloom, slow middle pour | 15 g · 230 ml |
+| 🧊 | **Iced Sunrise** | Iced pour over: brew strong onto about 120 g of ice | 20 g · 180 ml |
+| 😋 | **Sweet Spot** | Any beans, any day: balanced 1:16 in four even pours | 15 g · 240 ml |
+
+### 🐞 Fixed
+- 🌐 **Arabic:** the temperature and pour pattern under each pour on the recipe page were cut off. They now show in full.
 
 ### 🧪 Tested before release
-Every build now runs the real firmware in an emulator and taps through the whole panel: start-up, Grinder, Brewer and Scale, a full brew with pause and resume, the recipe editor, Wi-Fi, signing in, software update, the clock, emoji, and restarts into Arabic and back. **70 of 70 steps passed** for this release.
+The real firmware now runs in an emulator on every change and taps through the whole panel:
+- ✅ Start-up, Grinder, Brewer and Scale
+- ✅ A full brew with pause and resume
+- ✅ The recipe editor: an emoji name, then saving it
+- ✅ Wi-Fi: a wrong password, then the right one
+- ✅ Signing in, software update, the Double Shot page and the clock
+- ✅ Restarts into Arabic and back to English
 
-## 🚀 [4.0.0](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.0.0-ds.16) · 2026-11-23 · build 16
+**70 of 70 steps passed.**
 
-### ✨ xBloom Panel by Double Shot
-A fresh start, written from the ground up as Double Shot's own firmware, with the panel you know:
-- ☕ Your xBloom recipes (Created and Shared): load, start, pause and stop, with the dot-matrix brewing scene
-- ✏️ Edit and create recipes on the panel, synced back to your account
-- ⚙️ Grinder, Brewer and Scale, with drag-to-set controls
-- 🌐 English or العربية, right to left
-- 🛜 Wi-Fi updates that roll back by themselves if anything goes wrong
+### 🔧 Under the hood
+- 📦 Firmware is about 1.5 MB bigger (the emoji pictures). It still fits the update slot easily, so Wi-Fi updates work as before.
 
-## 🌐 [3.3.1 · build 15](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.15) · 2026-11-23
 
-### 🇸🇦 العربية
-- Arabic language with right-to-left screens
-- Two choices: Arabic numbers and units (٨٠ مل) or English ones (80 ml)
-- Recipe names always shown in full (no more "…"), and no overlapping text on any tab
+## ☕ [4.0.0 · build 16](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.0.0-ds.16) · 2026-11-23
+
+> [!IMPORTANT]
+> **A fresh start.** xBloom Panel by Double Shot is rebuilt from the ground up as Double Shot's own firmware. It's the same panel you know, now cleaner, faster to improve and ready for what's next.
+
+### ✨ Everything the panel does
+- ☕ **Your recipes:** Created and Shared, straight from your xBloom account. Load, start, pause and stop, with the dot-matrix brewing scene.
+- ✏️ **Edit on the panel:** change or create recipes on the screen. Edits sync back to your account.
+- ⚙️ **Grinder, Brewer and Scale:** the machine's manual modes, with drag-to-set controls, a timer and tare.
+- 🌐 **English or العربية:** full Arabic with right-to-left screens.
+- 🕰️ **Idle clock:** a dot-matrix clock instead of a dark screen, off at night if you like.
+- 🛜 **Wi-Fi updates:** install new versions from your phone. A version that fails to start rolls back by itself.
+- 🛍️ **Double Shot tab:** the store page, with QR codes for the shop and WhatsApp.
+
+### 🔄 Updating
+Coming from 3.3.1? Use **Settings → Software update** as usual. Your Wi-Fi, xBloom sign-in and screen settings are kept.
+
+
+## ☕ [3.3.1 · build 15](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.15) · 2026-11-23
+
+> [!TIP]
+> **Highlight:** 🇸🇦 the panel now speaks **العربية**
+
+### ✨ New
+- 🌐 **Arabic language:** every screen translated, laid out right to left.
+- 🔢 **Your choice of numbers** under **Settings → Language**:
+  - **العربية · وحدات عربية:** Arabic numbers and units too (٨٠ مل, ٩٣°م)
+  - **العربية · وحدات إنجليزية:** Arabic text, with numbers and units kept as 80 ml and 93°C
+- 🔤 **Arabic fonts:** IBM Plex Sans Arabic, with letters joined properly.
+
+### 🛠️ Improved
+- 📏 **Whole names:** recipe names and labels always fit, with no more "…".
+- 🧩 **No overlaps:** text and buttons rearrange so nothing collides, on every tab.
+
+### 🔧 Under the hood
+- 🗓️ Weekly automation, one job a day: watch the original project (Sun), dependency updates (Mon), platform check (Tue), release (Wed).
+
 
 ## ☕ [3.3.1 · build 12](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.12) · 2026-11-21
 
-### 🎉 The Double Shot edition
-- 🖼️ Double Shot boot logo
-- 🛍️ Double Shot tab: the store page with QR codes for the shop and WhatsApp
-- 💻 One-command installers for Mac and Windows
-- 📦 Release files named by how you install them (Wi-Fi update or USB)
-- 🧰 A 3D-printable case and a 90° USB-C cable link
+> [!TIP]
+> **Highlights:** 🛍️ the Double Shot tab · 📦 clearer download names
+
+### ✨ New
+- 🛍️ **Double Shot tab:** a full-screen store page with QR codes for the shop and WhatsApp.
+
+### 🛠️ Improved
+- 📦 **Clearer files:** each download is named after how you install it:
+  - 🛜 `UPDATE-WiFi-or-USB` for the panel's update page
+  - 🔌 `FULL-USB-ONLY` for a first install over USB
+- 📖 **Simpler README:** what the panel does and how to install it, in a few steps.
+
+### 🔧 Under the hood
+- 🤖 Automatic releases, dependency updates and a watch on the original project.
+
+
+## ☕ [3.3.1 · build 10](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.10) · 2026-11-21
+
+> [!TIP]
+> **Highlight:** 🛍️ meet the new Double Shot tab
+
+### ✨ New
+- 🛍️ **Double Shot tab:** a full-screen store page with QR codes for the shop and WhatsApp, one tap from Home.
+
+### 🔧 Under the hood
+- 🔄 Build tools updated.
+
+
+## ☕ [3.3.1 · build 7](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.7) · 2026-11-21
+
+> [!TIP]
+> **Highlights:** 🖼️ Double Shot boot logo · 💻 one-command installers · 🧰 printable case
+
+### ✨ New
+- 🖼️ **Double Shot boot logo:** the panel starts with "By: DOUBLE SHOT".
+- 💻 **One-command installers** for Mac and Windows: plug in the panel, paste one line, done.
+- 🧰 **3D-printable case (STL)** and a link to the 90° USB-C cable.
+
+### 📦 Based on xBloom Panel 3.3.1 by Mansour Alshekhi
+- 🕰️ A steadier clock
+- 🎛️ Drop-downs in Settings
+- 🔄 A Sync button for your recipes
+
+### 🔧 Under the hood
+- 🤖 Automatic firmware builds and releases, and dependency updates.
+
 
 ## 🌱 Where it started
 

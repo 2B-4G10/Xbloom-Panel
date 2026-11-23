@@ -115,6 +115,8 @@ jobs:
               echo "${LOG:-- Rebuilt with no source changes}"
             fi
             echo
+            echo "---"
+            echo
             echo "## 📦 Which file do I need?"
             echo
             echo "| File | How to install it | Your settings |"
@@ -149,12 +151,14 @@ jobs:
           git checkout -q main && git pull -q --ff-only
           # New entry under the intro (the first 4 lines), the notes without the file table.
           { head -n 4 CHANGELOG.md
-            echo "## ☕ [$VER](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG) · $(date -u +%Y-%m-%d) · build ${GITHUB_RUN_NUMBER}"; echo
-            sed '1,2d' notes.md | sed -n '/^## 📦 Which file/q;p'
+            echo "## ☕ [$VER · build ${GITHUB_RUN_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG) · $(date -u +%Y-%m-%d)"; echo
+            sed '1,2d' notes.md | sed -n '/^## 📦 Which file/q;p' | sed '/^---$/d'
             tail -n +5 CHANGELOG.md; } > CHANGELOG.new
           mv CHANGELOG.new CHANGELOG.md
-          # The notes are used: start the next ones empty.
+          # Keep this release's notes (.github/release-notes/<tag>.md), then start the next ones empty.
+          mkdir -p .github/release-notes
+          sed -n '/^## 📦 Which file/q;p' notes.md | sed '/^---$/d' > ".github/release-notes/$TAG.md"
           git show HEAD:.github/release-notes.md 2>/dev/null | sed -n '/^<!--/,/-->/p' > .github/release-notes.md || true
-          git add CHANGELOG.md .github/release-notes.md
+          git add CHANGELOG.md .github/release-notes.md .github/release-notes
           git commit -q -m "Changelog for $TAG [skip ci]"
           git push -q origin main || echo "::warning::Couldn't push CHANGELOG.md (main moved); the release notes are complete."

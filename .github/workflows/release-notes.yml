@@ -1,14 +1,15 @@
-# Puts .github/release-notes.md on an existing release page as its "What's new"
-# (the file table and checksums stay), then empties the file. For when a release
-# went out before its notes were written.
+# Puts the hand-written notes in .github/release-notes/<tag>.md on that release's
+# page as its "What's new" (the file table and checksums stay). Tag "all" updates
+# every release that has a notes file.
 name: Release notes
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag, e.g. v4.1.0-ds.17
+        description: Release tag (e.g. v4.1.0-ds.17), or "all"
         required: true
+        default: all
 
 permissions:
   contents: write
@@ -18,23 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Update the release page
+      - name: Update the release pages
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: |
-          NOTES=$(sed '/^<!--/,/-->/d' .github/release-notes.md | sed '/./,$!d')
-          [ -n "$NOTES" ] || { echo "::error::.github/release-notes.md is empty"; exit 1; }
-          VER=$(echo "$TAG" | sed 's/^v//; s/-ds\..*//')
-          gh release view "$TAG" --json body --jq .body > old.md
-          { echo "## ☕ What's new in $VER"; echo; echo "$NOTES"; echo
-            sed -n '/^## 📦 Which file/,$p' old.md; } > new.md
-          gh release edit "$TAG" --notes-file new.md
-          cat new.md
-      - name: Start the next notes empty
-        run: |
-          sed -n '/^<!--/,/-->/p' .github/release-notes.md > notes.tmp && mv notes.tmp .github/release-notes.md
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/release-notes.md
-          git diff --cached --quiet || { git commit -q -m "Release notes used for ${{ inputs.tag }} [skip ci]"; git push -q; }
+          if [ "$TAG" = all ]; then FILES=$(ls .github/release-notes/*.md); else FILES=".github/release-notes/$TAG.md"; fi
+          for f in $FILES; do
+            t=$(basename "$f" .md)
+            gh release view "$t" --json body --jq .body > old.md || { echo "::warning::no release $t"; continue; }
+            { cat "$f"; echo; echo "---"; echo; sed -n '/^## 📦/,$p' old.md; } > new.md
+            gh release edit "$t" --notes-file new.md
+            echo "updated $t"
+          done
