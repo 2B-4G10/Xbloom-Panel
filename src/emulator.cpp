@@ -21,6 +21,9 @@
 #include "pins_config.h"
 #include "ui.h"
 
+LV_FONT_DECLARE(inter_20);
+LV_FONT_DECLARE(inter_26b);
+
 namespace {
 
 // ---- display: two frames in PSRAM; the last finished one is the picture ----
@@ -409,8 +412,6 @@ void emoji_card() {
       "Keycaps 1️⃣#️⃣ flags 🇸🇦🇯🇵🇺🇸 🏴󠁧󠁢󠁳󠁣󠁴󠁿 ©️ new 🫨🪿🪼",
       "قهوة ☕ مع 🍓 وتمر 🌴",
   };
-  LV_FONT_DECLARE(inter_20);
-  LV_FONT_DECLARE(inter_26b);
   int y = 40;
   for (int i = 0; i < 4; i++) {
     char buf[200];
