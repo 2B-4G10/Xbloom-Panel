@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behaviour check for the plain C++ modules (protocol, recipe library, cloud crypto).
+# Behaviour check for the plain C++ modules (protocol, recipe library, cloud crypto, emoji).
 # Builds each golden test twice, against a reference commit and against the working
 # tree, and compares the output. Any difference means behaviour changed.
 #
@@ -43,5 +43,14 @@ if [ -n "${MBEDTLS_INC:-}" ] && [ -n "${MBEDTLS_LIB:-}" ]; then
   LIBS=$MBEDTLS_LIB run crypto test_native/crypto_golden.cpp src/cloud_crypto.cpp
 else
   echo "skipped   crypto (set MBEDTLS_INC and MBEDTLS_LIB)"
+fi
+# Emoji: a direct check (no reference build). Needs LVGL's headers (LVGL=folder).
+if [ -n "${LVGL:-}" ]; then
+  gcc -O1 -w -c src/emoji_data.c -o "$WORK/emoji_data.o"
+  g++ -O1 -w -std=c++17 -DLV_CONF_INCLUDE_SIMPLE -I include -I "$LVGL" -I "$LVGL/.." test_native/emoji_test.cpp src/emoji.cpp \
+    "$WORK/emoji_data.o" -o "$WORK/emoji"
+  if out=$("$WORK/emoji"); then echo "ok        emoji ($out)"; else echo "FAILED    emoji"; echo "$out" | head -20; fail=1; fi
+else
+  echo "skipped   emoji (set LVGL to the LVGL folder)"
 fi
 exit $fail

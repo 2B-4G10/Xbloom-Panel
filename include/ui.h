@@ -13,5 +13,5 @@ void show_clock(bool on);  // full-screen clock used instead of a black screen
 }  // namespace ui
 
 #ifdef UI_SIM
-namespace ui { void sim_show(int which, int recipe); }
+namespace ui { void sim_show(int which, int recipe); int sim_find(const char *name); }
 #endif

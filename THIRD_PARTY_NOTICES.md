@@ -38,3 +38,5 @@ LVGL (MIT), LovyanGFX (FreeBSD), NimBLE-Arduino (Apache-2.0), Arduino-ESP32 (LGP
 
 ArduinoJson (MIT). Inter font (SIL Open Font License 1.1), converted to LVGL fonts in src/fonts/.
 IBM Plex Sans Arabic (Copyright © 2017 IBM Corp., SIL Open Font License 1.1, full text in src/fonts/licenses/IBMPlexSansArabic-OFL.txt), converted to LVGL fonts in src/fonts/ar_*.c.
+
+Noto Color Emoji images (Copyright Google LLC; images under the Apache License 2.0, full text in src/fonts/licenses/NotoEmoji-Apache-2.0.txt; flag images from region-flags, public domain or exempt from copyright), from https://github.com/googlefonts/noto-emoji (tag v2026-09-24-unicode18_0), resized and recoloured to small palettes in src/emoji_data.c by tools/emoji/make_emoji.py.

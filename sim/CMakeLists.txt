@@ -7,7 +7,7 @@ include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/../include /root/ven
 add_subdirectory(${LVGL_DIR} lvgl)
 target_include_directories(lvgl PUBLIC ${CMAKE_SOURCE_DIR}/../include)
 file(GLOB FONTS ../src/fonts/*.c)
-add_executable(sim sim_main.cpp ../src/ui.cpp ../src/dotfx.cpp ../src/boot_logo.c ../src/store_logo.c ../src/xbloom_protocol.cpp ${FONTS} ../src/lv_mem_psram.c net_stub.cpp cloud_stub.cpp storage_stub.cpp ../src/library.cpp ../src/i18n.cpp)
+add_executable(sim sim_main.cpp ../src/ui.cpp ../src/dotfx.cpp ../src/boot_logo.c ../src/store_logo.c ../src/xbloom_protocol.cpp ${FONTS} ../src/lv_mem_psram.c net_stub.cpp cloud_stub.cpp storage_stub.cpp ../src/library.cpp ../src/i18n.cpp ../src/emoji.cpp ../src/emoji_data.c)
 target_compile_definitions(sim PRIVATE UI_SIM)
 set_source_files_properties(${FONTS} ../src/lv_mem_psram.c PROPERTIES COMPILE_DEFINITIONS LV_LVGL_H_INCLUDE_SIMPLE)
 target_link_libraries(sim lvgl)
