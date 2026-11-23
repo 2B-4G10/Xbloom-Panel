@@ -2,16 +2,16 @@
 #
 # Checks and installs everything it needs (winget, Git, Python 3.10-3.14,
 # PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the panel, backs up
-# its current firmware, builds this repo and flashes it.
+# its current firmware if asked (XBP_BACKUP=1), builds this repo and flashes it.
 #
 # Run in PowerShell (the repo is private; sign in with the GitHub CLI first, see README, Method 3):
 #   (see README: signs in to GitHub once, then clones 2B-4G10/Xbloom-Panel to $HOME\Xbloom-Panel)
 #   powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1"
 #
-# Options (set before running, e.g.  $env:XBP_NO_BACKUP = "1"):
+# Options (set before running, e.g.  $env:XBP_BACKUP = "1"):
 #   XBP_PORT=COM5          use this port instead of auto-detecting
 #   XBP_BAUD=115200        serial speed (115200 is the reliable default)
-#   XBP_NO_BACKUP=1        skip the backup step
+#   XBP_BACKUP=1           also back up the panel first (about 25 minutes; off by default)
 #   XBP_BUILD_ONLY=1       build the update file but don't flash
 #   XBP_DIR=...            where the source is kept (default: %USERPROFILE%\Xbloom-Panel)
 
@@ -171,7 +171,7 @@ if (-not $env:XBP_BUILD_ONLY) {
   $Mac = ([regex]::Match($chip, '([0-9a-f]{2}:){5}[0-9a-f]{2}')).Value -replace ':',''
   Ok "ESP32-S3 found $(if ($Mac) { "(MAC $Mac)" })"
 
-  if (-not $env:XBP_NO_BACKUP) {
+  if ($env:XBP_BACKUP -and -not $env:XBP_NO_BACKUP) {
     Step "Backing up the panel's current firmware (about 25 minutes at $Baud baud)"
     New-Item -ItemType Directory -Force $BackupDir -ErrorAction Stop | Out-Null
     $existing = Get-ChildItem $BackupDir -Filter "*$Mac*.bin" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -211,10 +211,10 @@ if ($env:XBP_BUILD_ONLY) {
 Step 'Flashing the panel (a few minutes)'
 # Same four pieces 'pio run -t upload' writes. Wi-Fi and xBloom login (NVS) are left alone.
 & $Esptool --chip esp32s3 -p $Port -b $Baud write-flash 0x0 "$B\bootloader.bin" 0x8000 "$B\partitions.bin" 0xe000 $BootApp0 0x10000 "$B\firmware.bin"
-if ($LASTEXITCODE -ne 0) { Die 'Flash failed. The panel may be half-written: run this again, or restore your backup (see README).' }
+if ($LASTEXITCODE -ne 0) { Die 'Flash failed. The panel may be half-written: just run this again (see README, Troubleshooting).' }
 
 Write-Host "`nDone! The panel is restarting with the Double Shot boot logo." -ForegroundColor Green
-Write-Host "    Backup: $BackupDir  |  Update file: $UpdateBin" -ForegroundColor DarkGray
+Write-Host "    Update file: $UpdateBin$(if ($env:XBP_BACKUP) { "  |  Backup: $BackupDir" })" -ForegroundColor DarkGray
 }
 catch {
   Write-Host "`n[x] Stopped: $($_.Exception.Message)" -ForegroundColor Red
