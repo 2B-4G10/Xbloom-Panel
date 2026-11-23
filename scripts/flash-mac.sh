@@ -6,7 +6,7 @@
 # panel, backs up its current firmware, builds this repo and flashes it.
 #
 # Run (the repo is private, so sign in with the GitHub CLI first; see README, Method 3):
-#   brew install gh && gh auth login && gh repo clone 2B-4G10/Xbloom-Panel ~/Xbloom-Panel && bash ~/Xbloom-Panel/scripts/flash-mac.sh
+#   (see README: signs in to GitHub once, then clones 2B-4G10/Xbloom-Panel to ~/Xbloom-Panel)
 #
 # Options (environment variables):
 #   XBP_PORT=/dev/cu.xxx   use this serial port instead of auto-detecting

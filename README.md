@@ -80,22 +80,25 @@ Use this for a new panel, or to recover one.
 
 ### 3️⃣ One command: builds from source and backs up first
 
+> [!IMPORTANT]
+> The project is private. You need a free [GitHub account](https://github.com/signup) that **Double Shot has invited** to `2B-4G10/Xbloom-Panel` (accept the invite from your email first). Without it, the download step stops with a message saying so.
+
 This method installs everything it needs, **backs up the panel**, builds the latest code and flashes it. Your settings are kept. The first run takes 30–60 minutes, mostly waiting ☕.
 
 **🍎 Mac.** Open **Terminal** and paste:
 
 ```bash
-brew install gh && gh auth login && gh repo clone 2B-4G10/Xbloom-Panel ~/Xbloom-Panel && bash ~/Xbloom-Panel/scripts/flash-mac.sh
+brew install gh && { gh auth status >/dev/null 2>&1 || gh auth login -h github.com -p https -w; } && { [ -d ~/Xbloom-Panel ] || gh repo clone 2B-4G10/Xbloom-Panel ~/Xbloom-Panel || { echo "❌ This GitHub account has no access to Xbloom-Panel yet: ask Double Shot to invite it."; false; }; } && bash ~/Xbloom-Panel/scripts/flash-mac.sh
 ```
 
 **🪟 Windows.** Open **PowerShell** and paste:
 
 ```powershell
-winget install -e --id GitHub.cli --accept-source-agreements --accept-package-agreements; winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements; $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User'); gh auth login; gh repo clone 2B-4G10/Xbloom-Panel "$HOME\Xbloom-Panel"; powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1"
+winget install -e --id GitHub.cli --accept-source-agreements --accept-package-agreements; winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements; $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User'); gh auth status *> $null; if ($LASTEXITCODE -ne 0) { gh auth login -h github.com -p https -w }; if (-not (Test-Path "$HOME\Xbloom-Panel")) { gh repo clone 2B-4G10/Xbloom-Panel "$HOME\Xbloom-Panel" }; if (Test-Path "$HOME\Xbloom-Panel\scripts\flash-windows.ps1") { powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1" } else { Write-Host 'This GitHub account has no access to Xbloom-Panel yet: ask Double Shot to invite it.' -ForegroundColor Red }
 ```
 
 What happens:
-- `gh auth login` signs you in to GitHub once. Choose **GitHub.com → HTTPS → Yes → Login with a web browser**.
+- 🔑 **Sign in to GitHub (first time only).** It shows a one-time code like `ABCD-1234`: press **Enter**, a browser opens, paste the code and approve. If it asks *Authenticate Git with your GitHub credentials?*, answer **Y**. Next time this step is skipped.
 - The script then checks and installs everything it needs: Python, the build tools, esptool and the USB driver. It explains each step as it goes.
 - It saves a **backup** of the panel to `Desktop/xBloom-backups` before changing anything.
 - It flashes the new firmware, and also leaves the Wi-Fi update file on your Desktop.
