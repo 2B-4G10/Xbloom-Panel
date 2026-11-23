@@ -1,22 +1,47 @@
-MIT License
+xBloom Panel by Double Shot
+Copyright (c) 2026 Faisal AlDossary (Double Shot). All rights reserved.
 
-Copyright (c) 2026 Faisal AlDossary (Double Shot)
-Portions copyright (c) 2026 Mansour Alshekhi
+This repository is public so people can see it, install it and check what it
+does. It is NOT open source: the code, firmware images, graphics, the Double
+Shot name and logo, and the documentation are protected by copyright and are
+licensed to you only on the terms below.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. WHAT YOU MAY DO
+   a) Download the released firmware files and install them on panels you own
+      or manage, for your own use.
+   b) Read the source code, and build it to install on your own panels.
+   c) Link to this repository or to its releases.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. WHAT YOU MAY NOT DO without written permission from Double Shot
+   a) Copy, republish, mirror or redistribute the source code, the firmware
+      files, or any part of them, in this or any other repository, website,
+      store or file-sharing service. (GitHub's "fork" button is allowed only as
+      GitHub's Terms of Service require; a fork may not be republished,
+      distributed or used outside GitHub.)
+   b) Modify, translate, adapt or make derivative works for distribution, or
+      remove or change this notice, the credits or the Double Shot branding.
+   c) Sell, rent or license the firmware or the code, or install it on panels
+      you sell, rent or offer as a product or service.
+   d) Use the Double Shot name or logo in any way that suggests endorsement.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. THIRD-PARTY PARTS
+   Libraries, fonts and images by others (LVGL, LovyanGFX, NimBLE-Arduino,
+   Arduino-ESP32, ArduinoJson, Inter, IBM Plex Sans Arabic, Noto Color Emoji
+   and others) stay under their own licences, listed with their notices in
+   THIRD_PARTY_NOTICES.md. Nothing here limits the rights those licences give
+   you in those parts. The idea and the look of the screens come from xBloom
+   Panel by Mansour Alshekhi, used under the MIT License (its notice is in
+   THIRD_PARTY_NOTICES.md).
+
+4. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED. YOU INSTALL IT AT YOUR OWN RISK. IN NO EVENT SHALL THE AUTHOR BE
+   LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE
+   OR ITS USE. Not affiliated with xBloom.
+
+5. ENDING
+   These permissions end automatically if you break these terms. Copies made
+   or shared against them infringe copyright and will be reported, including
+   through DMCA takedown notices.
+
+Permission requests: contact Double Shot through https://doubleshot-sa.com
