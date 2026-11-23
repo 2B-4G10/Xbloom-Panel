@@ -88,13 +88,13 @@ This method installs everything it needs, **backs up the panel**, builds the lat
 **🍎 Mac.** Open **Terminal** and paste:
 
 ```bash
-brew install gh && { gh auth status >/dev/null 2>&1 || gh auth login -h github.com -p https -w; } && { [ -d ~/Xbloom-Panel ] || gh repo clone 2B-4G10/Xbloom-Panel ~/Xbloom-Panel || { echo "❌ This GitHub account has no access to Xbloom-Panel yet: ask Double Shot to invite it."; false; }; } && bash ~/Xbloom-Panel/scripts/flash-mac.sh
+brew install gh && { gh auth status >/dev/null 2>&1 || gh auth login -h github.com -p https -w; } && { [ -d ~/Xbloom-Panel/.git ] || gh repo clone 2B-4G10/Xbloom-Panel ~/Xbloom-Panel || { echo "❌ This GitHub account has no access to Xbloom-Panel yet: ask Double Shot to invite it."; false; }; } && bash ~/Xbloom-Panel/scripts/flash-mac.sh
 ```
 
 **🪟 Windows.** Open **PowerShell** and paste:
 
 ```powershell
-winget install -e --id GitHub.cli --accept-source-agreements --accept-package-agreements; winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements; $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User'); gh auth status *> $null; if ($LASTEXITCODE -ne 0) { gh auth login -h github.com -p https -w }; if (-not (Test-Path "$HOME\Xbloom-Panel")) { gh repo clone 2B-4G10/Xbloom-Panel "$HOME\Xbloom-Panel" }; if (Test-Path "$HOME\Xbloom-Panel\scripts\flash-windows.ps1") { powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1" } else { Write-Host 'This GitHub account has no access to Xbloom-Panel yet: ask Double Shot to invite it.' -ForegroundColor Red }
+winget install -e --id GitHub.cli --accept-source-agreements --accept-package-agreements; winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements; $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User'); gh auth status *> $null; if ($LASTEXITCODE -ne 0) { gh auth login -h github.com -p https -w }; if (-not (Test-Path "$HOME\Xbloom-Panel\.git")) { gh repo clone 2B-4G10/Xbloom-Panel "$HOME\Xbloom-Panel" }; if (Test-Path "$HOME\Xbloom-Panel\scripts\flash-windows.ps1") { powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1" } else { Write-Host 'This GitHub account has no access to Xbloom-Panel yet: ask Double Shot to invite it.' -ForegroundColor Red }
 ```
 
 What happens:
