@@ -1,5 +1,9 @@
 # Changelog
 
+## [v4.0.0-ds.16](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.0.0-ds.16) · 2026-11-23
+
+- xBloom Panel by Double Shot 4.0.0 (a7f0dfe)
+
 ## [v3.3.1-ds.15](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.15) · 2026-11-23
 
 - Arabic numbers and units, whole names, no overlaps (3d225ee)
