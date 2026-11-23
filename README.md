@@ -6,6 +6,10 @@
 
 **A touchscreen for your xBloom Studio: recipes, brewing, grinder and scale at your fingertips, in English or العربية.**
 
+[![Downloads](https://img.shields.io/github/downloads/2B-4G10/Xbloom-Panel/total?label=%E2%AC%87%20downloads&color=34c759&style=for-the-badge)](https://github.com/2B-4G10/Xbloom-Panel/releases)
+[![Latest release](https://img.shields.io/github/v/release/2B-4G10/Xbloom-Panel?label=%E2%98%95%20latest&color=c8a27e&style=for-the-badge)](https://github.com/2B-4G10/Xbloom-Panel/releases/latest)
+[![This version's downloads](https://img.shields.io/github/downloads/2B-4G10/Xbloom-Panel/latest/total?label=%F0%9F%9A%80%20this%20version&color=0a84ff&style=for-the-badge)](https://github.com/2B-4G10/Xbloom-Panel/releases/latest)
+
 </div>
 
 ---
@@ -184,5 +188,11 @@ Use **Method 2**, but choose your backup file (in `Desktop/xBloom-backups`) inst
 ---
 
 Made with ☕ by **Double Shot** · © Double Shot, all rights reserved ([`LICENSE`](LICENSE)) · credits and third-party licences: `THIRD_PARTY_NOTICES.md`
+
+<br>
+
+### 🇸🇦 ❤️ ☕
+
+**Made By: @i_2B_4G10**
 
 </div>
