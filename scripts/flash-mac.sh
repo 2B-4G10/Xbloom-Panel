@@ -160,7 +160,7 @@ if [[ -z "${XBP_BUILD_ONLY:-}" && -z "$PORT" ]]; then
       warn "No panel found on USB. Check: the panel's screen is on, the cable carries data (not charge-only),"
       warn "and it's plugged straight into the Mac (no hub)."
     fi
-    [[ $attempt -eq 10 ]] && die "Still no panel port. See the Troubleshooting section of the README."
+    [[ $attempt -eq 10 ]] && die "Still no panel port. See Help in the README."
     ask "Press Enter to look again…" >/dev/null
   done
   if [[ ${#PORTS[@]} -eq 1 ]]; then
@@ -216,7 +216,7 @@ step "Flashing the panel (a few minutes)"
 # Same four pieces 'pio run -t upload' writes. Wi-Fi and xBloom login (NVS) are left alone.
 "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" write-flash \
   0x0 "$B/bootloader.bin" 0x8000 "$B/partitions.bin" 0xe000 "$BOOT_APP0" 0x10000 "$B/firmware.bin" \
-  || die "Flash failed. The panel may be half-written: just run this script again (see README, Troubleshooting)."
+  || die "Flash failed. The panel may be half-written: just run this script again (see Help in the README)."
 
 printf '\n%s🎉 Done! The panel is restarting with the Double Shot boot logo.%s\n' "$grn$bold" "$rst"
 printf '%s   Update file: %s%s%s\n' "$dim" "$UPDATE_BIN" "${XBP_BACKUP:+   ·   Backup: $BACKUP_DIR}" "$rst"
