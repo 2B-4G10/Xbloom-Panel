@@ -161,7 +161,7 @@ if (-not $env:XBP_BUILD_ONLY -and -not $Port) {
       Warn 'No panel found on USB. Check: the panel screen is on, the cable carries data (not charge-only),'
       Warn 'and it is plugged straight into the PC (no hub).'
     }
-    if ($attempt -eq 10) { Die 'Still no panel port. See the Troubleshooting section of the README.' }
+    if ($attempt -eq 10) { Die 'Still no panel port. See Help in the README.' }
     Read-Host '   Press Enter to look again' | Out-Null
   }
   Ok "Panel port: $Port"
@@ -214,7 +214,7 @@ if ($env:XBP_BUILD_ONLY) {
 Step 'Flashing the panel (a few minutes)'
 # Same four pieces 'pio run -t upload' writes. Wi-Fi and xBloom login (NVS) are left alone.
 & $Esptool --chip esp32s3 -p $Port -b $Baud write-flash 0x0 "$B\bootloader.bin" 0x8000 "$B\partitions.bin" 0xe000 $BootApp0 0x10000 "$B\firmware.bin"
-if ($LASTEXITCODE -ne 0) { Die 'Flash failed. The panel may be half-written: just run this again (see README, Troubleshooting).' }
+if ($LASTEXITCODE -ne 0) { Die 'Flash failed. The panel may be half-written: just run this again (see Help in the README).' }
 
 Write-Host "`nDone! The panel is restarting with the Double Shot boot logo." -ForegroundColor Green
 Write-Host "    Update file: $UpdateBin$(if ($env:XBP_BACKUP) { "  |  Backup: $BackupDir" })" -ForegroundColor DarkGray
