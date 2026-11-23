@@ -102,10 +102,18 @@ jobs:
           TAG="v${VER}-ds.${GITHUB_RUN_NUMBER}"
           if [ -n "$PREV" ]; then RANGE=("$PREV..HEAD"); else RANGE=(-n 30 HEAD); fi
           {
-            echo "## ☕ What's new${PREV:+ since $PREV}"
+            # Hand-written notes in .github/release-notes.md when there are any (kept
+            # friendly: emoji headings, what changed for the person at the panel);
+            # otherwise the list of changes.
+            NOTES=$(sed '/^<!--/,/-->/d' .github/release-notes.md 2>/dev/null | sed '/./,$!d')
+            echo "## ☕ What's new in $VER"
             echo
-            LOG=$(git log --no-merges --pretty='- %s (%h)' "${RANGE[@]}" -- . ':!CHANGELOG.md')
-            echo "${LOG:-- Rebuilt with no source changes}"
+            if [ -n "$NOTES" ]; then
+              echo "$NOTES"
+            else
+              LOG=$(git log --no-merges --pretty='- %s' "${RANGE[@]}" -- . ':!CHANGELOG.md' ':!.github/release-notes.md')
+              echo "${LOG:-- Rebuilt with no source changes}"
+            fi
             echo
             echo "## 📦 Which file do I need?"
             echo
@@ -122,6 +130,7 @@ jobs:
             echo '```'
           } > notes.md
           echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VER=$VER" >> "$GITHUB_ENV"
           cat notes.md
 
       - name: Publish the release
@@ -138,9 +147,14 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -q main && git pull -q --ff-only
-          { echo "# Changelog"; echo; echo "## [$TAG](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG) · $(date -u +%Y-%m-%d)"; echo;
-            sed '1,2d' notes.md | sed -n '/^## 📦 Which file/q;p'; if [ -f CHANGELOG.md ]; then sed '1,2d' CHANGELOG.md; fi; } > CHANGELOG.new
+          # New entry under the intro (the first 4 lines), the notes without the file table.
+          { head -n 4 CHANGELOG.md
+            echo "## ☕ [$VER](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG) · $(date -u +%Y-%m-%d) · build ${GITHUB_RUN_NUMBER}"; echo
+            sed '1,2d' notes.md | sed -n '/^## 📦 Which file/q;p'
+            tail -n +5 CHANGELOG.md; } > CHANGELOG.new
           mv CHANGELOG.new CHANGELOG.md
-          git add CHANGELOG.md
+          # The notes are used: start the next ones empty.
+          git show HEAD:.github/release-notes.md 2>/dev/null | sed -n '/^<!--/,/-->/p' > .github/release-notes.md || true
+          git add CHANGELOG.md .github/release-notes.md
           git commit -q -m "Changelog for $TAG [skip ci]"
           git push -q origin main || echo "::warning::Couldn't push CHANGELOG.md (main moved); the release notes are complete."

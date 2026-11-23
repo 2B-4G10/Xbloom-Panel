@@ -1,45 +1,57 @@
 # Changelog
 
-## [v4.1.0-ds.17](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.0-ds.17) · 2026-11-23
+All the good stuff, newest first. ☕
 
-- Emulator build: QEMU's Ethernet card for real internet, so sign-in talks to xBloom (c806a81)
-- Emulator test: match Arabic labels in their joined forms, close the finished scene and the store page, tap list rows (250292f)
-- Emulator test: list what the screen shows when a step fails, and print every step (620aa05)
-- Emulator build: larger loop stack, stack use in the start-up log, keep the ELF for crash reports (7b42651)
-- Emulator build: declare the fonts outside the file's namespace (85dd4a7)
-- Emulator test: run the firmware in QEMU and walk through every screen (054fd7b)
-- Colour emoji and five new starter recipes (cdce6c7)
+## 🍓 [4.1.0](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.0-ds.17) · 2026-11-23 · build 17
 
-## [v4.0.0-ds.16](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.0.0-ds.16) · 2026-11-23
+### 😋 Emoji, everywhere
+Every emoji now shows in full colour, on every screen: smileys, hearts, skin tones 👍🏽, families 👨‍👩‍👧‍👦, jobs 👩🏽‍💻, keycaps 1️⃣ and flags 🇸🇦. Give a recipe an emoji name and the panel shows it just like your phone does, and saves it exactly as you typed it.
 
-- xBloom Panel by Double Shot 4.0.0 (a7f0dfe)
+### ☕ Five new starter recipes
+Find them under **Recipes → Starter**, next to Daily Pour Over, Light Roast and Dark Roast:
 
-## [v3.3.1-ds.15](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.15) · 2026-11-23
+| | Recipe | Best for |
+|---|---|---|
+| 🍓 | **Berry Bomb** | Fruity naturals: hot, fine and in small pours to lift the berries |
+| 🍫 | **Chocolate Hug** | Chocolatey medium-dark beans: cooler and coarser for a round, heavy cup |
+| 🍯 | **Honey Morning** | Washed medium roasts: a long bloom and a slow middle pour for sweetness |
+| 🧊 | **Iced Sunrise** | Iced pour over: brewed strong onto about 120 g of ice |
+| 😋 | **Sweet Spot** | Any beans, any day: a balanced 1:16 in four even pours |
 
-- Arabic numbers and units, whole names, no overlaps (3d225ee)
-- Arabic language and right-to-left layout (2392f75)
-- Watch the original repo instead of importing it (bf04e6a)
-- Run all automation weekly, one job per day (27a987b)
-- Hold ESP32 platform at 55.03.39: 61.04.00 doesn't build yet (99aebe8)
-- Report sync and platform problems without GitHub Issues (dd99435)
+### 🌐 Arabic polish
+The temperature and pour pattern under each pour on the recipe page are no longer cut off.
 
-## [v3.3.1-ds.12](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.12) · 2026-11-21
+### 🧪 Tested before release
+Every build now runs the real firmware in an emulator and taps through the whole panel: start-up, Grinder, Brewer and Scale, a full brew with pause and resume, the recipe editor, Wi-Fi, signing in, software update, the clock, emoji, and restarts into Arabic and back. **70 of 70 steps passed** for this release.
 
-- Automate upstream sync, weekly releases and dependency updates (11b5ed3)
-- Name release files by install method; simpler README (e86e97a)
-- deps(actions): bump the github-actions group with 5 updates (3a6d589)
-- Pin pioarduino 6.1.19 to match the platform's SCons 4.8.1 (9ffa408)
-- Add a Double Shot tab: full-screen store page with QR codes (6145d65)
-- Build with the pioarduino core in ~/.platformio/penv (bad962f)
-- Automate firmware releases, upstream sync and Dependabot (ec27fc6)
-- Add Mac/Windows one-command installers, fix esp-modbus build, new README (66a2b87)
-- Add Double Shot boot logo (1cf2b68)
-- Installer page: cable link under step 1 (629d9dc)
-- Installer page: link to the case print file (98fe20f)
-- Case v1 (STL) and the 90-degree USB-C cable link (17f019f)
-- Add the 3.3.1 firmware images and source (8b8b791)
-- xBloom Panel 3.3.1: steadier clock, settings drop-downs, Sync button (d5b22a0)
-- Add the AliExpress buy link (a0449fb)
-- xBloom Panel 3.3.0: firmware, one-click installer, case (d36c8bf)
+## 🚀 [4.0.0](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.0.0-ds.16) · 2026-11-23 · build 16
 
-Release notes are added here automatically by the weekly release.
+### ✨ xBloom Panel by Double Shot
+A fresh start, written from the ground up as Double Shot's own firmware, with the panel you know:
+- ☕ Your xBloom recipes (Created and Shared): load, start, pause and stop, with the dot-matrix brewing scene
+- ✏️ Edit and create recipes on the panel, synced back to your account
+- ⚙️ Grinder, Brewer and Scale, with drag-to-set controls
+- 🌐 English or العربية, right to left
+- 🛜 Wi-Fi updates that roll back by themselves if anything goes wrong
+
+## 🌐 [3.3.1 · build 15](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.15) · 2026-11-23
+
+### 🇸🇦 العربية
+- Arabic language with right-to-left screens
+- Two choices: Arabic numbers and units (٨٠ مل) or English ones (80 ml)
+- Recipe names always shown in full (no more "…"), and no overlapping text on any tab
+
+## ☕ [3.3.1 · build 12](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v3.3.1-ds.12) · 2026-11-21
+
+### 🎉 The Double Shot edition
+- 🖼️ Double Shot boot logo
+- 🛍️ Double Shot tab: the store page with QR codes for the shop and WhatsApp
+- 💻 One-command installers for Mac and Windows
+- 📦 Release files named by how you install them (Wi-Fi update or USB)
+- 🧰 A 3D-printable case and a 90° USB-C cable link
+
+## 🌱 Where it started
+
+The original xBloom Panel by Mansour Alshekhi:
+- **3.3.1**: a steadier clock, drop-downs in Settings and a Sync button
+- **3.3.0**: the first firmware, a one-click installer and the case
