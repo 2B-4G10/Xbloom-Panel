@@ -5,7 +5,7 @@
 # its current firmware, builds this repo and flashes it.
 #
 # Run in PowerShell (the repo is private; sign in with the GitHub CLI first, see README, Method 3):
-#   gh auth login; gh repo clone 2B-4G10/Xbloom-Panel "$HOME\Xbloom-Panel"
+#   (see README: signs in to GitHub once, then clones 2B-4G10/Xbloom-Panel to $HOME\Xbloom-Panel)
 #   powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1"
 #
 # Options (set before running, e.g.  $env:XBP_NO_BACKUP = "1"):
