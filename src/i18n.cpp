@@ -50,7 +50,7 @@ Entry table[] = {
   {"SCREEN", "الشاشة"},
   {"Clock when idle", "الساعة عند الخمول"},
   {"Sleep after", "إطفاء الشاشة بعد"},
-  {"1 min\n3 min\n5 min\n10 min\nNever", "دقيقة\n3 دقائق\n5 دقائق\n10 دقائق\nأبدًا"},
+  {"1 min\n3 min\n5 min\n10 min\nNever", "دقيقة\n٣ دقائق\n٥ دقائق\n١٠ دقائق\nأبدًا"},
   {"Clock colour", "لون الساعة"},
   {"White\nBlue\nBrown", "أبيض\nأزرق\nبني"},
   {"Off at night (11 PM-6 AM)", "إطفاء ليلًا (11 م - 6 ص)"},
@@ -137,6 +137,7 @@ Entry table[] = {
   {"BUSY", "مشغول"},
   {"Not connected to the xBloom", "غير متصل بمكينة xBloom"},
   {"Another recipe is on the machine", "توجد وصفة أخرى على المكينة"},
+  {"/ %.0f ml", "من %.0f ml"},
   {"%d pours  |  %.0f ml", "%d صبّات  |  %.0f ml"},
   {"%.0f\xC2\xB0" "C  |  %s  |  %d of %d", "%.0f\xC2\xB0" "C  |  %s  |  %d من %d"},
   {"Pour %d", "الصبّة %d"},
@@ -144,7 +145,6 @@ Entry table[] = {
   {"Command failed", "فشل الأمر"},
   {"Enjoy", "بالعافية"},
   {"Paused", "متوقف مؤقتًا"},
-  {"min", "د"},
 
   // Cups, grinder, brewer
   {"Espresso", "إسبريسو"},
@@ -230,6 +230,7 @@ Entry table[] = {
 
 constexpr size_t N = sizeof table / sizeof table[0];
 Lang cur = Lang::EN;
+bool ar_units = false;
 bool sorted = false;
 
 bool less(const Entry &a, const Entry &b) { return strcmp(a.en, b.en) < 0; }
@@ -245,12 +246,96 @@ void set_lang(Lang l) {
 }
 
 Lang lang() { return cur; }
+void set_arabic_units(bool on) { ar_units = on; }
+bool arabic_units() { return cur == Lang::AR && ar_units; }
 
 const char *tr(const char *en) {
   if (cur == Lang::EN || !en || !*en || !sorted) return en;
   const Entry key{en, nullptr};
   const Entry *e = std::lower_bound(table, table + N, key, less);
   return (e != table + N && strcmp(e->en, en) == 0) ? e->ar : en;
+}
+
+namespace {
+struct Unit {
+  const char *en, *ar;
+  bool spaced;  // a space between the number and the Arabic unit
+};
+// Longest first, so "ml/s" wins over "ml" and "min" over "m".
+const Unit units[] = {
+    {"ml/s", "مل/ث", true}, {"RPM", "دورة/د", true}, {"min", "د", true}, {"ml", "مل", true},
+    {"oz", "أونصة", true},  {"°C", "°م", false},     {"g", "جم", true},   {"s", "ث", true},
+};
+
+bool is_alpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+}  // namespace
+
+const char *localize(const char *in, char *buf, size_t n) {
+  if (!arabic_units() || !in || !*in || n < 8) return in;
+  int dots = 0;
+  for (const char *p = in; *p; ++p) dots += *p == '.';
+  if (dots > 1) return in;  // an address or a version number
+  if (in[0] == '+') return in;  // a phone number
+  size_t o = 0;
+  auto put = [&](const char *t) {
+    const size_t l = strlen(t);
+    if (o + l + 1 >= n) return false;
+    memcpy(buf + o, t, l);
+    o += l;
+    return true;
+  };
+  bool after_digit = false;
+  for (const char *p = in; *p;) {
+    const char c = *p;
+    if (c >= '0' && c <= '9') {
+      // A number such as "9:25" or "88.4". LVGL's bidi pass treats Arabic-Indic digits
+      // as right-to-left letters and reverses the whole number when drawing, so the
+      // number is written here back to front and comes out in the right order.
+      const char *tok[48];
+      int k = 0;
+      const char *q = p;
+      while (k < 48) {
+        if (*q >= '0' && *q <= '9') {
+          static const char *const digit[10] = {"\xD9\xA0", "\xD9\xA1", "\xD9\xA2", "\xD9\xA3", "\xD9\xA4",
+                                                "\xD9\xA5", "\xD9\xA6", "\xD9\xA7", "\xD9\xA8", "\xD9\xA9"};
+          tok[k++] = digit[*q++ - '0'];
+        } else if (q[1] >= '0' && q[1] <= '9' && strchr(".:,/-'", *q) && *q) {
+          static const char *const sep[] = {"\xD9\xAB", ":", ",", "/", "-", "'"};  // "." -> Arabic decimal mark
+          tok[k++] = sep[strchr(".:,/-'", *q) - ".:,/-'"];
+          ++q;
+        } else {
+          break;
+        }
+      }
+      while (k > 0)
+        if (!put(tok[--k])) return in;
+      p = q;
+      after_digit = true;
+      continue;
+    }
+    const Unit *u = nullptr;
+    for (const Unit &k : units) {
+      const size_t l = strlen(k.en);
+      if (strncmp(p, k.en, l) == 0 && !is_alpha(p[l]) && (p == in || !is_alpha(p[-1]))) {
+        u = &k;
+        break;
+      }
+    }
+    if (u) {
+      if (u->spaced && after_digit && !put(" ")) return in;
+      if (!put(u->ar)) return in;
+      p += strlen(u->en);
+      after_digit = false;
+      continue;
+    }
+    if (is_alpha(c)) return in;  // other Latin text: leave it as it is
+    char one[2] = {c, 0};
+    if (!put(one)) return in;
+    ++p;
+    after_digit = false;
+  }
+  buf[o] = 0;
+  return buf;
 }
 
 }  // namespace i18n

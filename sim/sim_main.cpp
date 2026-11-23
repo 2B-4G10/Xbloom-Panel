@@ -55,6 +55,7 @@ int main(int argc, char **argv) {
     ev(UiEvType::Link, 3, 0, "XBLOOM 381"); run(500);
     ui::sim_show(9, 0); run(800); save("st_settings.ppm");
     ui::sim_show(27, 0); run(800); save("st_dropdown.ppm");
+    ui::sim_show(30, 0); run(800); save("st_language.ppm");
     ui::sim_show(13, 0); run(400); save("st_clock.ppm");
     return 0;
   }

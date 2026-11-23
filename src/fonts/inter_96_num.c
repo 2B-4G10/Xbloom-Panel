@@ -10,6 +10,8 @@
 #include "lvgl.h"
 #endif
 
+LV_FONT_DECLARE(ar_num_96);
+
 #ifndef INTER_96_NUM
 #define INTER_96_NUM 1
 #endif
@@ -2399,7 +2401,7 @@ lv_font_t inter_96_num = {
 #endif
     .dsc = &font_dsc,          /*The custom font data. Will be accessed by `get_glyph_bitmap/dsc` */
 #if LV_VERSION_CHECK(8, 2, 0) || LVGL_VERSION_MAJOR >= 9
-    .fallback = NULL,
+    .fallback = &ar_num_96,   /* Arabic digits (src/fonts/ar_num_96.c) */
 #endif
     .user_data = NULL,
 };

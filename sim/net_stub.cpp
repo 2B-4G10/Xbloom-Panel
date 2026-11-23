@@ -44,7 +44,7 @@ int pref_clock_color() { return ccolor; }
 void set_pref_clock_color(int c) { ccolor = c; }
 static int lang_pref = -1;
 int pref_lang() {
-  if (lang_pref < 0) lang_pref = (getenv("SIM_LANG") && !strcmp(getenv("SIM_LANG"), "ar")) ? 1 : 0;
+  if (lang_pref < 0) lang_pref = !getenv("SIM_LANG") ? 0 : !strcmp(getenv("SIM_LANG"), "ar") ? 1 : !strcmp(getenv("SIM_LANG"), "ar-en") ? 2 : 0;
   return lang_pref;
 }
 void set_pref_lang(int l) { lang_pref = l; }

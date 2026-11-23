@@ -8,6 +8,12 @@
 #include "ui_theme.h"
 #include "i18n.h"
 
+// Every label here shows its text in the panel's language (Arabic digits and units too).
+static void set_label(lv_obj_t *l, const char *t) {
+  static char buf[128];
+  lv_label_set_text(l, i18n::localize(i18n::tr(t), buf, sizeof buf));
+}
+
 namespace dotfx {
 
 const uint32_t BLUE = 0x3F9BFF;
@@ -318,7 +324,8 @@ float finish_fn(Field *, int c, int r, uint32_t t, uint32_t *color) {
 
 lv_obj_t *label(lv_obj_t *p, const lv_font_t *f, uint32_t color) {
   lv_obj_t *l = lv_label_create(p);
-  lv_label_set_text(l, "");
+  if (i18n::rtl()) lv_obj_set_style_base_dir(l, LV_BASE_DIR_AUTO, 0);  // each text in its own direction
+  set_label(l, "");
   lv_obj_set_style_text_font(l, f, 0);
   lv_obj_set_style_text_color(l, hexc(color), 0);
   return l;
@@ -447,13 +454,13 @@ lv_obj_t *brew_btn(lv_obj_t *p, int x, int y, int w, int h, uint32_t bg, lv_obj_
   lv_obj_set_flex_align(b, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_column(b, 10, 0);
   lv_obj_t *ic = lv_label_create(b);  // symbols come from the Montserrat icon font
-  lv_label_set_text(ic, sym);
+  set_label(ic, sym);
   lv_obj_set_style_text_font(ic, &lv_font_montserrat_20, 0);
   lv_obj_set_style_text_color(ic, hexc(fg), 0);
   if (icon) *icon = ic;
   if (txt) {
     lv_obj_t *l = lv_label_create(b);
-    lv_label_set_text(l, i18n::tr(txt));
+    set_label(l, txt);
     lv_obj_set_style_text_font(l, &inter_20b, 0);
     lv_obj_set_style_text_color(l, hexc(fg), 0);
     if (lbl) *lbl = l;
@@ -478,7 +485,7 @@ void build_brew() {
   const char *caps[2] = {"Scale", "Time"};
   for (int i = 0; i < 2; ++i) {
     bs_cap[i] = label(bs_layer, &inter_16, 0x8E8E93);
-    lv_label_set_text(bs_cap[i], i18n::tr(caps[i]));
+    set_label(bs_cap[i], caps[i]);
     lv_obj_set_pos(bs_cap[i], X + i * 170, 262);
     bs_stat[i][0] = label(bs_layer, &inter_34b, 0xFFFFFF);
     bs_stat[i][1] = label(bs_layer, &inter_16, 0x9A9AA0);
@@ -493,8 +500,14 @@ void build_brew() {
 void place_pair(lv_obj_t *n, lv_obj_t *u, int x, int base) {
   lv_obj_update_layout(n);
   const lv_font_t *fn = lv_obj_get_style_text_font(n, 0), *fu = lv_obj_get_style_text_font(u, 0);
-  lv_obj_set_pos(n, x, base - (lv_font_get_line_height(fn) - fn->base_line));
-  lv_obj_set_pos(u, x + lv_obj_get_width(n) + 6, base - (lv_font_get_line_height(fu) - fu->base_line));
+  int xn = x, xu = x + lv_obj_get_width(n) + 6;
+  if (i18n::arabic_units()) {  // Arabic reads the number first, so its unit goes on the left
+    lv_obj_update_layout(u);
+    xu = x;
+    xn = x + lv_obj_get_width(u) + 6;
+  }
+  lv_obj_set_pos(n, xn, base - (lv_font_get_line_height(fn) - fn->base_line));
+  lv_obj_set_pos(u, xu, base - (lv_font_get_line_height(fu) - fu->base_line));
 }
 void anim_tick(lv_timer_t *) {
   for (int i = 0; i < anim_n; ++i) {
@@ -522,8 +535,8 @@ void anim_tick(lv_timer_t *) {
 
 void intro_play(const char *name, const char *sub) {
   build();
-  lv_label_set_text(in_name, name);
-  lv_label_set_text(in_sub, sub);
+  set_label(in_name, name);
+  set_label(in_sub, sub);
   lv_obj_align(in_name, LV_ALIGN_TOP_MID, 0, 318);
   lv_obj_align(in_sub, LV_ALIGN_TOP_MID, 0, 368);
   lv_obj_set_style_bg_opa(in_layer, LV_OPA_COVER, 0);
@@ -541,8 +554,8 @@ void finish_play(const char *name, float grams, float ml, uint32_t ms) {
   in_on = false;
   lv_obj_add_flag(in_layer, LV_OBJ_FLAG_HIDDEN);
   brew_hide();
-  lv_label_set_text(fn_title, i18n::tr("Enjoy"));
-  lv_label_set_text(fn_name, name);
+  set_label(fn_title, "Enjoy");
+  set_label(fn_name, name);
   lv_obj_align(fn_title, LV_ALIGN_TOP_MID, 0, 290);
   lv_obj_align(fn_name, LV_ALIGN_TOP_MID, 0, 336);
   char v[3][16];
@@ -551,16 +564,17 @@ void finish_play(const char *name, float grams, float ml, uint32_t ms) {
   snprintf(v[2], 16, "%lu:%02lu", (unsigned long)(ms / 60000), (unsigned long)(ms / 1000 % 60));
   const char *u[3] = {"g", "ml", "min"};
   for (int i = 0; i < 3; ++i) {
-    lv_label_set_text(fn_stats[i][0], v[i]);
-    lv_label_set_text(fn_stats[i][1], i18n::tr(u[i]));
+    set_label(fn_stats[i][0], v[i]);
+    set_label(fn_stats[i][1], u[i]);
     // number + unit, centred as a pair in each third, on a shared baseline
     lv_obj_update_layout(fn_stats[i][0]);
     lv_obj_update_layout(fn_stats[i][1]);
     const int wn = lv_obj_get_width(fn_stats[i][0]), wu = lv_obj_get_width(fn_stats[i][1]);
-    const int cx = 160 + i * 240, x0 = cx - (wn + 6 + wu) / 2, base = 418;
+    const bool rtl = i18n::arabic_units();  // Arabic units: weight on the right, unit left of its number
+    const int cx = 160 + (rtl ? 2 - i : i) * 240, x0 = cx - (wn + 6 + wu) / 2, base = 418;
     const lv_font_t *fb = &inter_34b, *fs = &inter_20;
-    lv_obj_set_pos(fn_stats[i][0], x0, base - (lv_font_get_line_height(fb) - fb->base_line));
-    lv_obj_set_pos(fn_stats[i][1], x0 + wn + 6, base - (lv_font_get_line_height(fs) - fs->base_line));
+    lv_obj_set_pos(fn_stats[i][0], rtl ? x0 + wu + 6 : x0, base - (lv_font_get_line_height(fb) - fb->base_line));
+    lv_obj_set_pos(fn_stats[i][1], rtl ? x0 : x0 + wn + 6, base - (lv_font_get_line_height(fs) - fs->base_line));
   }
   lv_obj_remove_flag(fn_layer, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_foreground(fn_layer);
@@ -575,7 +589,7 @@ void brew_show(const char *name, void (*on_pause)(), void (*on_stop)()) {
   bs_on_stop = on_stop;
   bs_level = 0;
   bs_v = {};
-  lv_label_set_text(bs_name, name);
+  set_label(bs_name, name);
   lv_obj_remove_flag(bs_layer, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_foreground(bs_layer);
   restart(bs_field);
@@ -585,23 +599,23 @@ void brew_show(const char *name, void (*on_pause)(), void (*on_stop)()) {
 void brew_update(const BrewView &v) {
   if (!bs_on) return;
   bs_v = v;
-  lv_label_set_text(bs_title, i18n::tr(v.paused ? "Paused" : v.pour_title));
-  lv_label_set_text(bs_sub, v.pour_sub);
+  set_label(bs_title, v.paused ? "Paused" : v.pour_title);
+  set_label(bs_sub, v.pour_sub);
   char b[24];
   snprintf(b, sizeof b, "%.0f", v.water_ml);
-  lv_label_set_text(bs_water, b);
-  snprintf(b, sizeof b, "/ %.0f ml", v.total_ml);
-  lv_label_set_text(bs_water_u, b);
+  set_label(bs_water, b);
+  snprintf(b, sizeof b, i18n::arabic_units() ? i18n::tr("/ %.0f ml") : "/ %.0f ml", v.total_ml);
+  set_label(bs_water_u, b);
   place_pair(bs_water, bs_water_u, 440, 236);
   snprintf(b, sizeof b, "%.1f", v.grams);
-  lv_label_set_text(bs_stat[0][0], b);
-  lv_label_set_text(bs_stat[0][1], "g");
+  set_label(bs_stat[0][0], b);
+  set_label(bs_stat[0][1], "g");
   snprintf(b, sizeof b, "%lu:%02lu", (unsigned long)(v.ms / 60000), (unsigned long)(v.ms / 1000 % 60));
-  lv_label_set_text(bs_stat[1][0], b);
-  lv_label_set_text(bs_stat[1][1], i18n::tr("min"));
+  set_label(bs_stat[1][0], b);
+  set_label(bs_stat[1][1], "min");
   for (int i = 0; i < 2; ++i) place_pair(bs_stat[i][0], bs_stat[i][1], 440 + i * 170, 326);
-  lv_label_set_text(bs_pause_lbl, i18n::tr(v.paused ? "RESUME" : "PAUSE"));
-  lv_label_set_text(bs_pause_icon, v.paused ? LV_SYMBOL_PLAY : LV_SYMBOL_PAUSE);
+  set_label(bs_pause_lbl, v.paused ? "RESUME" : "PAUSE");
+  set_label(bs_pause_icon, v.paused ? LV_SYMBOL_PLAY : LV_SYMBOL_PAUSE);
 }
 
 void brew_hide() {

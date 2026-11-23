@@ -87,12 +87,17 @@ lv_timer_t *toast_timer;
 // Only touch LVGL when something really changes: every change makes the panel
 // redraw that area, and redraws compete with the display for PSRAM bandwidth
 // (redrawing the clock and status bar 5x a second caused the line glitches).
+void refit(lv_obj_t *l);
 void set_text(lv_obj_t *l, const char *t) {
   t = tr(t);  // the Arabic text when Arabic is on (anything without a translation shows as is)
+  static char loc[256];
+  t = i18n::localize(t, loc, sizeof loc);  // Arabic digits and units ("80ml" -> "٨٠ مل")
   const char *cur = lv_label_get_text(l);
   if (cur && t && strcmp(cur, t) == 0) return;
   lv_label_set_text(l, t);
+  if (lv_obj_get_user_data(l) && lv_obj_check_type(l, &lv_label_class)) refit(l);  // see fit_text()
 }
+
 // ----------------------------------------------------------------------------
 // Right-to-left (Arabic). Screens are laid out with left-to-right coordinates.
 // With Arabic on, every object is mirrored once, just before it is first drawn:
@@ -207,7 +212,7 @@ void open_editor(uint32_t uid);
 void open_store(lv_event_t *);
 void open_account(lv_event_t * = nullptr);
 void toggle_favorite(uint32_t uid);
-lv_obj_t *st_acc_val;
+lv_obj_t *st_acc_val, *st_lang_dd;
 
 // Plain rectangle. Not clickable unless on_click() is called on it, so
 // decorations never swallow a tap meant for the card underneath.
@@ -247,6 +252,40 @@ lv_obj_t *text(lv_obj_t *parent, const char *t, const lv_font_t *f, lv_color_t c
 void baseline_align(lv_obj_t *l, lv_align_t align, int x, int from_bottom) {
   const lv_font_t *f = lv_obj_get_style_text_font(l, 0);
   lv_obj_align(l, align, x, f->base_line - from_bottom);
+}
+
+// Labels that must show their whole text: the font steps down (26 -> 20 -> 16 -> 14 px)
+// until the wrapped text fits the label's width and `max_h`; set_text() refits them
+// whenever their text changes. Their user data holds max_h and the starting size.
+const lv_font_t *const FIT_STEPS[] = {&inter_26b, &inter_20b, &inter_16, &inter_14};
+const lv_font_t *const FIT_STEPS_REG[] = {&inter_20, &inter_16, &inter_14};
+void refit(lv_obj_t *l) {
+  const uintptr_t d = (uintptr_t)lv_obj_get_user_data(l);
+  const int max_h = (int)(d >> 8), first = (int)(d & 0x7F) - 1;
+  const bool regular = d & 0x80;
+  const lv_font_t *const *steps = regular ? FIT_STEPS_REG : FIT_STEPS;
+  const int n = regular ? 3 : 4;
+  const int w = lv_obj_get_style_width(l, 0);
+  const char *t = lv_label_get_text(l);
+  for (int i = first; i < n; ++i) {
+    lv_point_t sz;
+    lv_text_get_size(&sz, t, steps[i], 0, 0, w, LV_TEXT_FLAG_NONE);
+    if (sz.y <= max_h || i == n - 1) {
+      if (lv_obj_get_style_text_font(l, 0) != steps[i]) lv_obj_set_style_text_font(l, steps[i], 0);
+      return;
+    }
+  }
+}
+void fit_text(lv_obj_t *l, int w, int max_h) {
+  const lv_font_t *f = lv_obj_get_style_text_font(l, 0);
+  const bool regular = f == &inter_20;
+  int first = 0;
+  if (!regular)
+    while (first < 3 && FIT_STEPS[first] != f) ++first;
+  lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(l, w);
+  lv_obj_set_user_data(l, (void *)(((uintptr_t)max_h << 8) | (regular ? 0x80 : 0) | (uintptr_t)(first + 1)));
+  refit(l);
 }
 
 // Put `l` to the left (or right) of `ref` with the two baselines lined up.
@@ -439,9 +478,12 @@ lv_obj_t *recipe_tile(lv_obj_t *parent, int x, int y, int w, int h, const PanelR
   baseline_align(num, LV_ALIGN_BOTTOM_RIGHT, -6, h < 90 ? -4 : 2);  // small tiles: number bleeds off the edge like the app
   lv_obj_t *top = text(t, show_name ? p.r.name : recipes::cup_name(p.r.cup_type),
                        show_name ? &inter_20b : &inter_16, ink);
-  lv_label_set_long_mode(top, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(top, w - 24);
-  if (show_name) lv_obj_set_height(top, 2 * lv_font_get_line_height(&inter_20b));
+  if (show_name) {
+    fit_text(top, w - 24, 2 * lv_font_get_line_height(&inter_20b));
+  } else {
+    lv_label_set_long_mode(top, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(top, w - 24);
+  }
   lv_obj_set_pos(top, 12, 10);
   lv_obj_t *cup = cup_icon(t, p.r.cup_type, ink);
   lv_obj_align(cup, LV_ALIGN_BOTTOM_LEFT, 12, -12);
@@ -698,13 +740,18 @@ void build_recipe_list() {
     pressable(row);
     recipe_tile(row, 0, (ROW_H - TILE) / 2, TILE, TILE, lib[i], false);
     lv_obj_t *n = text(row, lib[i].r.name, &inter_20b, hex(TEXT));
-    lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(n, W - 2 * M - TILE - 80);
+    fit_text(n, W - 2 * M - TILE - 80, 2 * lv_font_get_line_height(&inter_16));
     lv_obj_set_pos(n, TILE + 20, 18);
     char buf[64];
     recipe_line(lib[i].r, buf, sizeof buf);
     lv_obj_t *s = text(row, buf, &inter_16, hex(MUTED));
     lv_obj_set_pos(s, TILE + 20, 48);
+    lv_obj_update_layout(n);
+    if (lv_obj_get_height(n) > lv_font_get_line_height(&inter_20b)) {  // a long name: centre name + line together
+      const int hn = lv_obj_get_height(n), top = (ROW_H - (hn + 4 + lv_font_get_line_height(&inter_16))) / 2;
+      lv_obj_set_y(n, top);
+      lv_obj_set_y(s, top + hn + 4);
+    }
     lv_obj_t *chev = text(row, LV_SYMBOL_RIGHT, &lv_font_montserrat_16, hex(0x48484A));
     lv_obj_align(chev, LV_ALIGN_RIGHT_MID, -4, 0);
     if (lib[i].dirty && lib[i].kind != KIND_SEED && cloud::state() == cloud::Acct::SignedIn) {
@@ -792,9 +839,8 @@ lv_obj_t *row(lv_obj_t *card, int i, int h, const char *label, lv_obj_t **value_
   }
   if (value_out) {
     *value_out = text(r, "", &inter_20, hex(MUTED));
-    lv_label_set_long_mode(*value_out, LV_LABEL_LONG_DOT);
     lv_obj_update_layout(l);
-    lv_obj_set_width(*value_out, w - 16 - lv_obj_get_width(l) - 24 + right);  // all the space the label leaves
+    fit_text(*value_out, w - 16 - lv_obj_get_width(l) - 24 + right, h - 8);  // all the space the label leaves
     lv_obj_set_style_text_align(*value_out, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_align(*value_out, LV_ALIGN_RIGHT_MID, right, 0);
   }
@@ -860,8 +906,7 @@ lv_obj_t *pill(lv_obj_t *parent, int x, int y, int w, int h, const char *label, 
 void sub_header(lv_obj_t *scr, const char *title, lv_event_cb_t back, lv_obj_t **title_out = nullptr) {
   back_button(scr, LV_SYMBOL_LEFT, back);
   lv_obj_t *t = text(scr, title, &inter_26b, hex(TEXT));
-  lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(t, W - 2 * M - 120);
+  fit_text(t, W - 2 * M - 120, 44);
   lv_obj_set_pos(t, M + 44, SB + 10);
   if (title_out) *title_out = t;
 }
@@ -920,17 +965,21 @@ void build_settings_page(lv_obj_t *page) {
 
   lv_obj_t *c4 = section(page, "LANGUAGE", x2, y0 + 24 + 4 * rh + G, cw, 1, rh);
   lv_obj_t *rl = row(c4, 0, rh, "Language", nullptr, nullptr);
-  lv_obj_t *dl = dropdown(rl, "English\n" "\xD8\xA7\xD9\x84\xD8\xB9\xD8\xB1\xD8\xA8\xD9\x8A\xD8\xA9", [](lv_event_t *e) {
+  // 0 English · 1 Arabic with Arabic numbers and units ("٨٠ مل") · 2 Arabic with English units ("80 ml")
+  lv_obj_t *dl = dropdown(rl, "English\n"
+                              "العربية · وحدات عربية\n"
+                              "العربية · وحدات إنجليزية",
+                          [](lv_event_t *e) {
     const int l = (int)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(e));
     if (l == net::pref_lang()) return;
     net::set_pref_lang(l);  // the screens are rebuilt in the new language after a restart
-    show_toast(l == 1 ? "\xD8\xAC\xD8\xA7\xD8\xB1\xD9\x8D \xD8\xA5\xD8\xB9\xD8\xA7\xD8\xAF\xD8\xA9 "
-                        "\xD8\xA7\xD9\x84\xD8\xAA\xD8\xB4\xD8\xBA\xD9\x8A\xD9\x84..."
-                      : "Restarting...");
+    show_toast(l >= 1 ? "جارٍ إعادة التشغيل..." : "Restarting...");
     lv_timer_t *t = lv_timer_create([](lv_timer_t *) { restart_panel(); }, 1200, nullptr);
     lv_timer_set_repeat_count(t, 1);
   });
-  lv_dropdown_set_selected(dl, net::pref_lang() == 1 ? 1 : 0);
+  lv_obj_set_width(dl, 240);
+  st_lang_dd = dl;
+  lv_dropdown_set_selected(dl, (uint32_t)LV_CLAMP(0, net::pref_lang(), 2));
 }
 
 void format_clock(const struct tm &t, char *hm, size_t n);
@@ -986,8 +1035,7 @@ void build_network_list() {
     lv_obj_t *ic = text(r, LV_SYMBOL_WIFI, &lv_font_montserrat_20, hex(q > -60 ? TEXT : q > -75 ? SUB : MUTED));
     lv_obj_align(ic, LV_ALIGN_LEFT_MID, 16, 0);
     lv_obj_t *n = text(r, wf_aps[i].ssid, &inter_20, hex(TEXT));
-    lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(n, w - 150);
+    fit_text(n, w - 150, 52);
     lv_obj_align(n, LV_ALIGN_LEFT_MID, 52, 0);
     const bool here = joined && strcmp(wf_aps[i].ssid, net::ssid()) == 0;
     lv_obj_t *tag = text(r, here ? LV_SYMBOL_OK : wf_aps[i].secure ? "Secured" : "Open",
@@ -1039,8 +1087,7 @@ void build_wifi() {
 
   lv_obj_t *card = box(scr_wifi, rx, 96, rw, 200, 0x1C1C1E, R_SM);
   wf_status_title = text(card, "", &inter_20b, hex(TEXT));
-  lv_label_set_long_mode(wf_status_title, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(wf_status_title, rw - 32);
+  fit_text(wf_status_title, rw - 32, 48);
   lv_obj_set_pos(wf_status_title, 16, 16);
   wf_status_sub = text(card, "", &inter_16, hex(SUB));
   lv_label_set_long_mode(wf_status_sub, LV_LABEL_LONG_WRAP);
@@ -1538,7 +1585,6 @@ void build_detail() {
   lv_obj_t *cl = text(hdr, recipes::cup_name(r.cup_type), &inter_20, ink);
   lv_obj_set_pos(cl, 52, 17);
   lv_obj_t *name = text(hdr, r.name, &inter_20, dark);
-  lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
   lv_obj_set_width(name, D_LEFT_W - 140);
   lv_obj_set_pos(name, 20, 66);
   char buf[48];
@@ -1554,6 +1600,13 @@ void build_detail() {
   lv_obj_t *vol = text(hdr, buf, &inter_34b, dark);
   lv_obj_update_layout(sep);
   baseline_align(vol, LV_ALIGN_BOTTOM_LEFT, lv_obj_get_x(sep) + 14, 22);
+  // The whole name, in a smaller size if needed, between the cup row and the ratio row.
+  lv_obj_update_layout(hdr);
+  const int name_top = 46, name_room = lv_obj_get_y(ratio) + 6 - name_top;
+  fit_text(name, D_LEFT_W - 140, name_room);
+  lv_obj_update_layout(name);
+  if (lv_obj_get_height(name) > lv_font_get_line_height(&inter_20))  // more than one line: centre it in the room
+    lv_obj_set_y(name, name_top + (name_room - lv_obj_get_height(name)) / 2);
 
   // ---- stats (Dose / Grind / RPM; live readings while brewing) ----
   lv_obj_t *st = box(scr_detail, M, D_STATS_Y, D_LEFT_W, D_STATS_H, 0x2C2C2E, R_SM);
@@ -1567,6 +1620,8 @@ void build_detail() {
     d_stat_unit[i] = text(col, "", &inter_16, hex(SUB));
     lv_obj_add_flag(d_stats[i][1], RTL_KEEP);  // number + unit, centred by set_stat()
     lv_obj_add_flag(d_stat_unit[i], RTL_KEEP);
+    lv_obj_set_style_base_dir(d_stats[i][1], LV_BASE_DIR_LTR, 0);
+    lv_obj_set_style_base_dir(d_stat_unit[i], LV_BASE_DIR_LTR, 0);
   }
 
   // ---- START pill + stop circle ----
@@ -1657,8 +1712,13 @@ void set_stat(int i, const char *num, const char *unit) {
   }
   const int x0 = (colw - (wn + gap + wu)) / 2, base = D_STATS_H - 18;
   const lv_font_t *fs = &inter_16;
-  lv_obj_set_pos(n, x0, base - (lv_font_get_line_height(big) - big->base_line));
-  lv_obj_set_pos(u, x0 + wn + gap, base - (lv_font_get_line_height(fs) - fs->base_line));
+  // Arabic reads the unit after the number, so it sits on the number's left.
+  const bool ar = i18n::arabic_units();
+  const int xn = ar ? x0 + wu + gap : x0, xu = ar ? x0 : x0 + wn + gap;
+  lv_obj_set_style_align(n, LV_ALIGN_TOP_LEFT, 0);  // explicit: a default anchor follows RTL
+  lv_obj_set_style_align(u, LV_ALIGN_TOP_LEFT, 0);
+  lv_obj_set_pos(n, xn, base - (lv_font_get_line_height(big) - big->base_line));
+  lv_obj_set_pos(u, xu, base - (lv_font_get_line_height(fs) - fs->base_line));
 }
 
 void fmt_min_sec(char *buf, size_t n, uint32_t ms) {
@@ -1879,8 +1939,10 @@ void render_scale() {
   set_text(sc_unit, unit == 0 ? "g" : unit == 1 ? "oz" : "ml");
   lv_obj_update_layout(sc_unit);
   // centre value + unit together
-  lv_obj_align(sc_value, LV_ALIGN_CENTER, -(lv_obj_get_width(sc_unit) + 6) / 2, 0);
-  baseline_next_to(sc_unit, sc_value, false, 6);
+  const int shift = (lv_obj_get_width(sc_unit) + 6) / 2;
+  const bool ar = i18n::arabic_units();
+  lv_obj_align(sc_value, LV_ALIGN_CENTER, ar ? shift : -shift, 0);
+  baseline_next_to(sc_unit, sc_value, ar, 6);  // Arabic units: the unit on the left
 }
 
 void set_unit(int u, bool send) {
@@ -1922,6 +1984,8 @@ void build_scale() {
   sc_unit = text(inner, "g", &inter_34b, hex(0x5FB5A4));
   lv_obj_add_flag(sc_value, RTL_KEEP);  // number + unit, centred by render_scale()
   lv_obj_add_flag(sc_unit, RTL_KEEP);
+  lv_obj_set_style_base_dir(sc_value, LV_BASE_DIR_LTR, 0);
+  lv_obj_set_style_base_dir(sc_unit, LV_BASE_DIR_LTR, 0);
   const char *u[3] = {"g", "oz", "ml"};
   const int bh = 60, bgap = 12;
   for (int i = 0; i < 3; ++i) {
@@ -2278,8 +2342,7 @@ void build_editor() {
   const int lx = M, lw = 352, top = 96;
   lv_obj_t *nm = box(scr_edit, lx, top, lw, 52, 0x1C1C1E, R_SM);
   ed_name = text(nm, "", &inter_20b, hex(TEXT));
-  lv_label_set_long_mode(ed_name, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(ed_name, lw - 60);
+  fit_text(ed_name, lw - 60, 48);
   lv_obj_align(ed_name, LV_ALIGN_LEFT_MID, 16, 0);
   lv_obj_t *pen = text(nm, LV_SYMBOL_EDIT, &lv_font_montserrat_16, hex(MUTED));
   lv_obj_align(pen, LV_ALIGN_RIGHT_MID, -16, 0);
@@ -2707,7 +2770,9 @@ void splash() {
 }
 
 void begin() {
-  i18n::set_lang(net::pref_lang() == 1 ? i18n::Lang::AR : i18n::Lang::EN);
+  // Language setting: 0 English, 1 Arabic with Arabic numbers and units, 2 Arabic with English units
+  i18n::set_lang(net::pref_lang() >= 1 ? i18n::Lang::AR : i18n::Lang::EN);
+  i18n::set_arabic_units(net::pref_lang() == 1);
   rtl = i18n::rtl();
   if (rtl) {
     lv_obj_set_style_base_dir(lv_layer_top(), LV_BASE_DIR_RTL, 0);
@@ -2860,6 +2925,7 @@ void sim_show(int which, int recipe) {
     case 26: brew_ended(); break;
     case 27: lv_screen_load(scr_home); set_tab(2); lv_dropdown_open(st_sleep_dd); break;
     case 28: open_store(nullptr); break;
+    case 30: lv_screen_load(scr_home); set_tab(2); lv_dropdown_open(st_lang_dd); break;
     case 29: close_store(nullptr); break;
     case 22: dotfx::finish_play(lib[recipe].r.name, 141.3f, 220, 181000); break;
     case 23: clock_color = dotfx::WHITE; show_clock(true); break;
