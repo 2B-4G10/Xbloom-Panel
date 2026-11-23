@@ -1,0 +1,146 @@
+# Firmware builds and weekly releases.
+# - Pull requests (incl. Dependabot's) that touch the firmware or the build are built as a check.
+# - Every Wednesday, if anything changed since the last release, the firmware is built and a
+#   new release is published with the .bin files and a changelog. "Run workflow" does the
+#   same on demand. (Weekly schedule: Sun upstream watch · Mon Dependabot · Tue platform check
+#   · Wed release.)
+name: Build & release firmware
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "include/**"
+      - "boards/**"
+      - "platformio.ini"
+      - "partitions.csv"
+      - "requirements-build.txt"
+      - ".github/**"
+  schedule:
+    - cron: "17 18 * * 3"   # weekly: Wednesday 18:17 UTC (21:17 Riyadh), after the week's updates
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Release even if nothing changed since the last release
+        type: boolean
+        default: false
+
+concurrency:
+  group: firmware-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Decides whether this run publishes a release (weekly/manual runs with changes only).
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      prev: ${{ steps.decide.outputs.prev }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          PREV=$(git tag --merged HEAD --list 'v*-ds.*' --sort=-creatordate | head -1)
+          echo "prev=$PREV" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" != schedule ] && [ "$EVENT" != workflow_dispatch ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$FORCE" = true ] || [ -z "$PREV" ] || [ -n "$(git log --format=%h "$PREV..HEAD" -- . ':!CHANGELOG.md')" ]; then
+            echo "Changes since ${PREV:-the beginning}: releasing."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nothing changed since $PREV: no release this week."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: github.event_name == 'pull_request' || needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      version: ${{ steps.fw.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: fw
+        uses: ./.github/actions/build-firmware
+      - uses: actions/upload-artifact@v7
+        with:
+          name: firmware
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    needs: [check, build]
+    if: needs.check.outputs.release == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # full history + tags for the changelog
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: firmware
+          path: dist
+
+      - name: Write the changelog
+        env:
+          VER: ${{ needs.build.outputs.version }}
+          PREV: ${{ needs.check.outputs.prev }}
+        run: |
+          TAG="v${VER}-ds.${GITHUB_RUN_NUMBER}"
+          if [ -n "$PREV" ]; then RANGE=("$PREV..HEAD"); else RANGE=(-n 30 HEAD); fi
+          {
+            echo "## ☕ What's new${PREV:+ since $PREV}"
+            echo
+            LOG=$(git log --no-merges --pretty='- %s (%h)' "${RANGE[@]}" -- . ':!CHANGELOG.md')
+            echo "${LOG:-- Rebuilt with no source changes}"
+            echo
+            echo "## 📦 Which file do I need?"
+            echo
+            echo "| File | How to install it | Your settings |"
+            echo "|---|---|---|"
+            echo "| 🛜 \`xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin\` | **Wi-Fi:** on the panel, **Settings → Software update**, then upload this file from your phone. (USB also works, written at address \`0x10000\`.) | ✅ Kept |"
+            echo "| 🔌 \`xbloom-panel-doubleshot-FULL-USB-ONLY.bin\` | **USB cable only**, written at address \`0x0\` (first install, or to recover a panel). | ⚠️ Reset (Wi-Fi and xBloom login) |"
+            echo
+            echo "> ⛔ **Never upload the FULL-USB-ONLY file on the panel's Wi-Fi update page.** It is a whole-flash image for USB and won't work as a Wi-Fi update."
+            echo
+            echo "SHA-256:"
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+          } > notes.md
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          cat notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VER: ${{ needs.build.outputs.version }}
+        run: |
+          gh release create "$TAG" dist/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin dist/xbloom-panel-doubleshot-FULL-USB-ONLY.bin dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "xBloom Panel $VER · Double Shot (build ${GITHUB_RUN_NUMBER})" \
+            --notes-file notes.md --latest
+
+      - name: Add it to CHANGELOG.md
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q main && git pull -q --ff-only
+          { echo "# Changelog"; echo; echo "## [$TAG](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG) · $(date -u +%Y-%m-%d)"; echo;
+            sed '1,2d' notes.md | sed -n '/^## 📦 Which file/q;p'; if [ -f CHANGELOG.md ]; then sed '1,2d' CHANGELOG.md; fi; } > CHANGELOG.new
+          mv CHANGELOG.new CHANGELOG.md
+          git add CHANGELOG.md
+          git commit -q -m "Changelog for $TAG [skip ci]"
+          git push -q origin main || echo "::warning::Couldn't push CHANGELOG.md (main moved); the release notes are complete."
