@@ -70,7 +70,7 @@ jobs:
             if ! kill -0 $QEMU 2>/dev/null; then echo "QEMU stopped"; break; fi
           done
           kill $QEMU 2>/dev/null || true
-          grep -av '^@@' serial.log | tail -n 80
+          grep -aE '^\[|xBloom Panel|Guru|Backtrace|reason' serial.log
 
       - name: Report
         run: |
