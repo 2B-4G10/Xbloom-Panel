@@ -194,7 +194,7 @@ Made with ☕ by **Double Shot** · © Double Shot, all rights reserved ([`LICEN
 
 ### 🇸🇦 ❤️ ☕
 
-**Made By: @i_2B_4G10**
+**Made By: [@i_2B_4G10](https://t.me/i_2B_4G10)**
 
 [![Support on Patreon](https://img.shields.io/badge/Support_me_on-Patreon-F96854?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/c/Dossary)
 
