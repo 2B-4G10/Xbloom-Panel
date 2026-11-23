@@ -5,7 +5,10 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include <esp_eth.h>
+#include <esp_event.h>
 #include <esp_heap_caps.h>
+#include <esp_netif.h>
 #include <lvgl.h>
 #include <misc/lv_text_ap.h>
 #include <math.h>
@@ -601,6 +604,37 @@ void start_display() {
   timeval tv = {1795415100, 0};
   settimeofday(&tv, nullptr);
   Serial.println("[emu] emulator build: in-memory display, simulated machine and Wi-Fi");
+}
+
+void start_network() {
+#if CONFIG_ETH_USE_OPENETH
+  esp_netif_init();
+  esp_event_loop_create_default();  // may exist already
+  esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
+  esp_netif_t *netif = esp_netif_new(&netif_cfg);
+  eth_mac_config_t mac_cfg = ETH_MAC_DEFAULT_CONFIG();
+  eth_phy_config_t phy_cfg = ETH_PHY_DEFAULT_CONFIG();
+  phy_cfg.autonego_timeout_ms = 100;
+  esp_eth_mac_t *mac = esp_eth_mac_new_openeth(&mac_cfg);
+  esp_eth_phy_t *phy = esp_eth_phy_new_dp83848(&phy_cfg);
+  esp_eth_config_t cfg = ETH_DEFAULT_CONFIG(mac, phy);
+  esp_eth_handle_t eth = nullptr;
+  if (!mac || !phy || esp_eth_driver_install(&cfg, &eth) != ESP_OK) {
+    Serial.println("[emu] no network card");
+    return;
+  }
+  esp_netif_attach(netif, esp_eth_new_netif_glue(eth));
+  esp_event_handler_register(
+      IP_EVENT, IP_EVENT_ETH_GOT_IP,
+      [](void *, esp_event_base_t, int32_t, void *data) {
+        const ip_event_got_ip_t *e = (const ip_event_got_ip_t *)data;
+        Serial.printf("[emu] network up, " IPSTR "\n", IP2STR(&e->ip_info.ip));
+      },
+      nullptr);
+  esp_eth_start(eth);
+#else
+  Serial.println("[emu] no network card (CONFIG_ETH_USE_OPENETH is off)");
+#endif
 }
 
 void begin() {
