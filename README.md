@@ -17,19 +17,16 @@
 
 ## 👋 What is it?
 
-Firmware for an **Elecrow CrowPanel Advance 4.3″** touchscreen that sits next to your **xBloom Studio** and controls it over Bluetooth.
+A touchscreen that sits next to your **xBloom Studio** and runs it over Bluetooth. It's an **Elecrow CrowPanel Advance 4.3″** with this firmware on it.
 
-| | |
-|---|---|
-| ☕ **Brew your recipes** | Your xBloom account's recipes (Created and Shared) on the panel. Load, start, pause and stop, with a live dot-matrix brewing scene. |
-| 🍓 **Eight starter recipes** | Daily Pour Over, Light and Dark Roast, plus 🍓 Berry Bomb, 🍫 Chocolate Hug, 🍯 Honey Morning, 🧊 Iced Sunrise and 😋 Sweet Spot, always under Recipes → Starter. |
-| 😋 **Emoji** | Every emoji in colour: skin tones, families, professions, keycaps and flags, in recipe names and everywhere else. |
-| ✏️ **Edit on the panel** | Change or create recipes right on the screen. Edits sync back to your account. |
-| ⚙️ **Grinder, Brewer, Scale** | The machine's manual modes, with drag-to-set controls, a timer and tare. |
-| 🌐 **English or العربية** | Full Arabic with right-to-left screens. Choose Arabic numbers and units (٨٠ مل) or English ones (80 ml). |
-| 🕰️ **Idle clock** | A dot-matrix clock instead of a dark screen (white, blue or brown), off at night if you like. |
-| 🛜 **Wi-Fi updates** | Install new versions from your phone. A version that fails to start rolls back by itself. |
-| 🛍️ **Double Shot tab** | The store page, with QR codes for [doubleshot-sa.com](https://doubleshot-sa.com) and WhatsApp. |
+- ☕ **Your recipes**, from your xBloom account, with a live dot-matrix brewing scene
+- 🍓 **8 starter recipes**, including 🍓 Berry Bomb, 🍫 Chocolate Hug and 🧊 Iced Sunrise
+- ✏️ **Edit recipes on the screen**, synced back to your account
+- ⚙️ **Grinder, Brewer and Scale** controls
+- 🌐 **English or العربية**, with Arabic or English numbers
+- 😋 **Every emoji** in colour
+- 🕰️ **Idle clock** and 🛜 **Wi-Fi updates**
+- 🛍️ **Double Shot tab** with QR codes for the shop
 
 <div align="center">
   <img alt="Boot screen" src="docs/images/boot-screen.png" width="400">
@@ -38,87 +35,55 @@ Firmware for an **Elecrow CrowPanel Advance 4.3″** touchscreen that sits next 
 
 > Unofficial: not affiliated with xBloom.
 
----
-
-## 🧺 What you need
-
-- 🖥️ **Elecrow CrowPanel Advance 4.3″** (the **Advance** 800×480 model): [AliExpress](https://a.aliexpress.com/_c3srIHtH) · [Elecrow](https://www.elecrow.com/crowpanel-advance-4-3-hmi-esp32-800x480-ai-display-ips-touch-artificial-intelligent-screen.html)
-- 🔌 **A USB-C cable that carries data.** Charge-only cables won't work.
+**You need:** a CrowPanel **Advance** 4.3″ (800×480) from [AliExpress](https://a.aliexpress.com/_c3srIHtH) or [Elecrow](https://www.elecrow.com/crowpanel-advance-4-3-hmi-esp32-800x480-ai-display-ips-touch-artificial-intelligent-screen.html), and a USB-C cable that carries data.
 
 ---
 
-## 📦 The two firmware files
+## 🚀 Install (pick one)
 
-Tap to download the newest version (no sign-in needed), or see the [**latest release**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest). Each name tells you how to install it:
+### 1️⃣ Over Wi-Fi: if the panel already runs xBloom Panel
 
-| File | Install it with | Your settings |
-|---|---|---|
-| 🛜 [**`xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin`**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin) | **Wi-Fi** from the panel's settings (Method 1) | ✅ Kept |
-| 🔌 [**`xbloom-panel-doubleshot-FULL-USB-ONLY.bin`**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin) | **USB cable only** (Method 2) | ⚠️ Wi-Fi and xBloom login reset |
+1. Download [**the Wi-Fi update file**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin).
+2. On the panel: **Settings → Software update**. Open the address it shows on your phone.
+3. Choose the file and upload. The panel restarts. Your settings stay. 🎉
 
-> ⛔ **Never upload the FULL-USB-ONLY file on the Wi-Fi update page.** It only works over USB.
+### 2️⃣ Over USB: new panel, no software needed
 
----
+1. Download [**the USB file**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin) and plug in the panel.
+2. In **Chrome** or **Edge**, open **https://espressif.github.io/esptool-js/**
+3. Baudrate `115200` → **Connect** → pick the panel's port.
+4. Flash Address `0x0` → choose the file → **Program**.
+5. Press the panel's **RESET** button. Set up Wi-Fi and your account again.
 
-## 🚀 How to install (pick one)
+> ⛔ The USB file only works over USB. Never upload it on the Wi-Fi update page.
 
-### 1️⃣ Wi-Fi update: easiest, if the panel already runs xBloom Panel
+### 3️⃣ One command: builds the latest code and flashes it
 
-1. Download [**`xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin`**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin) to your phone or computer.
-2. On the panel, go to **Settings → Software update**.
-3. Open the address the panel shows (on a phone or computer on the same Wi-Fi), choose the file, and upload it.
-4. The panel restarts with the new firmware. Your settings stay. 🎉
+Plug in the panel and paste one line. It installs everything it needs. The first run takes 30–60 minutes ☕. **To update later, paste the same line again.**
 
-### 2️⃣ USB with the `.bin` file: no software to install
-
-Use this for a new panel, or to recover one.
-
-1. Download [**`xbloom-panel-doubleshot-FULL-USB-ONLY.bin`**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin).
-2. Connect the panel to your computer with the USB-C cable.
-3. In **Chrome** or **Edge**, open Espressif's web flasher: **https://espressif.github.io/esptool-js/**
-4. Set **Baudrate** to `115200`, click **Connect**, and pick the panel's port. On a Mac it's named `wchusbserial…`.
-5. Set **Flash Address** to `0x0`, choose the **FULL-USB-ONLY** file, and click **Program**.
-6. When it finishes, press the panel's **RESET** button, then set up Wi-Fi and your xBloom account again.
-
-> 💡 **No port shows up?** The panel's USB chip (WCH CH34x) needs a driver on some computers. **Mac:** install the [WCH driver](https://www.wch-ic.com/downloads/CH34XSER_MAC_ZIP.html), then turn it on in **System Settings → General → Login Items & Extensions → Driver Extensions**. **Windows:** install [CH341SER](https://www.wch-ic.com/downloads/CH341SER_EXE.html). Then replug the panel.
-
-### 3️⃣ One command: builds from source
-
-This method installs everything it needs, builds the latest code and flashes it. Your settings are kept. The first run takes 30–60 minutes, mostly waiting for the build ☕.
-
-**🍎 Mac.** Open **Terminal** and paste:
+**🍎 Mac** (Terminal):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/scripts/flash-mac.sh -o /tmp/xbp.sh && bash /tmp/xbp.sh
 ```
 
-**🪟 Windows.** Open **PowerShell** and paste:
+**🪟 Windows** (PowerShell):
 
 ```powershell
 irm https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/scripts/flash-windows.ps1 -OutFile "$env:TEMP\xbp.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\xbp.ps1"
 ```
 
-What happens:
-- It downloads the project to your home folder (`Xbloom-Panel`), and updates it on later runs.
-- The script then checks and installs everything it needs: Python, the build tools, esptool and the USB driver. It explains each step as it goes.
-- Want a copy of the panel's current firmware first? Add the `XBP_BACKUP=1` option below (about 25 minutes more). You can always go back with the FULL-USB-ONLY file anyway.
-- It flashes the new firmware, and also leaves the Wi-Fi update file on your Desktop.
-
-On a Mac, if `brew` isn't found, install [Homebrew](https://brew.sh) first.
-
-**To run it again later:** Mac: `bash ~/Xbloom-Panel/scripts/flash-mac.sh` · Windows: `powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1"`
-
 <details>
-<summary>⚙️ Options for the command method</summary>
+<summary>⚙️ Options</summary>
 
-Put these before the command. On a Mac: `XBP_BACKUP=1 bash …`. On Windows, run e.g. `$env:XBP_BACKUP="1"` first.
+Set before the command: Mac `XBP_BACKUP=1 bash …` · Windows `$env:XBP_BACKUP="1"`
 
 | Option | Effect |
 |---|---|
-| `XBP_BUILD_ONLY=1` | Only build the Wi-Fi update file; don't touch the panel |
-| `XBP_BACKUP=1` | Back up the panel to `Desktop/xBloom-backups` before flashing (about 25 minutes) |
-| `XBP_PORT=…` | Use a specific port (`/dev/cu.wchusbserial110`, `COM5`) |
-| `XBP_BAUD=…` | Serial speed (default `115200`; try `57600` with a long cable) |
+| `XBP_BACKUP=1` | Back up the panel to `Desktop/xBloom-backups` first (about 25 minutes) |
+| `XBP_BUILD_ONLY=1` | Only build the Wi-Fi update file |
+| `XBP_PORT=…` | Use this port (`/dev/cu.wchusbserial110`, `COM5`) |
+| `XBP_BAUD=…` | Serial speed (default `115200`, try `57600` with a long cable) |
 
 </details>
 
@@ -128,8 +93,8 @@ Put these before the command. On a Mac: `XBP_BACKUP=1 bash …`. On Windows, run
 
 1. **Settings → Wi-Fi:** pick your network.
 2. **Settings → xBloom account:** sign in with your xBloom app email and password.
-3. Turn on the xBloom Studio. The panel connects by itself over Bluetooth.
-4. **Settings → Language:** English or العربية (Arabic, right-to-left). The panel restarts in the new language.
+3. Turn on the xBloom Studio. The panel connects by itself.
+4. **Settings → Language:** English or العربية.
 
 ---
 
@@ -138,50 +103,45 @@ Put these before the command. On a Mac: `XBP_BACKUP=1 bash …`. On Windows, run
 <details>
 <summary><b>The computer doesn't see the panel</b></summary>
 
-Use a data cable, plug straight into the computer (no hub), and install the USB driver (see the 💡 tip in Method 2). On a Mac, `ls /dev/cu.*` should list a `cu.wchusbserial…` port.
+Use a data cable plugged straight into the computer (no hub), and install the USB driver:
+- **Mac:** the [WCH driver](https://www.wch-ic.com/downloads/CH34XSER_MAC_ZIP.html), then allow it in **System Settings → General → Login Items & Extensions → Driver Extensions**.
+- **Windows:** [CH341SER](https://www.wch-ic.com/downloads/CH341SER_EXE.html).
+
+Then unplug and replug the panel.
 </details>
 
 <details>
-<summary><b>"Invalid head of packet … serial noise"</b></summary>
+<summary><b>Stuck at "Connecting…" or "serial noise"</b></summary>
 
-The serial speed is too high. Use `115200`, or `57600` with a shorter cable.
+Hold **BOOT**, tap **RESET**, release **BOOT**, and try again. With a long cable, use speed `57600`.
 </details>
 
 <details>
-<summary><b>Stuck at "Connecting…"</b></summary>
+<summary><b>The one-command install stopped</b></summary>
 
-Hold **BOOT**, tap **RESET**, release **BOOT**, and try again. Press **RESET** once after flashing.
+Paste the same command again: it picks up where it left off. The build is the slow part (30–60 minutes the first time); while new lines keep appearing, it's working. On Windows, don't click inside the PowerShell window: that pauses it until you press <kbd>Enter</kbd>.
 </details>
 
 <details>
-<summary><b>↩️ Restore your backup</b></summary>
+<summary><b>↩️ Restore a backup</b></summary>
 
-Use **Method 2**, but choose your backup file (in `Desktop/xBloom-backups`) instead of the FULL-USB-ONLY file, at address `0x0`. The panel returns exactly to how it was, settings included.
+Use **Method 2** with your backup file (from `Desktop/xBloom-backups`) at address `0x0`.
 </details>
 
----
+<details>
+<summary><b>🤖 How it stays up to date</b></summary>
 
-## 🤖 How it stays up to date
-
-| When | What happens automatically |
-|---|---|
-| **Sunday** | The [original project](https://github.com/Mesh-one/Xbloom-panel) is checked for new changes. Nothing is merged: if there's something new, GitHub emails you a summary to review, with the full changes attached to the run. After review, run **Watch the original repo** with **Mark the current upstream as reviewed** ticked. |
-| **Monday** | Dependabot updates the build automation. Each update is test-built and merged automatically if it passes. |
-| **Tuesday** | The ESP32 platform is updated with its matching build tool, test-built first and added only if it passes. A platform version that doesn't build yet is skipped and noted in `.github/essentials-hold.txt`. |
-| **Wednesday** | If anything changed that week, a new [release](https://github.com/2B-4G10/Xbloom-Panel/releases) is published with both `.bin` files and a [changelog](CHANGELOG.md). |
+Every week: Sunday checks the [original project](https://github.com/Mesh-one/Xbloom-panel) for changes to review, Monday and Tuesday test and apply tool updates, and Wednesday publishes a [release](https://github.com/2B-4G10/Xbloom-Panel/releases) if anything changed (see the [changelog](CHANGELOG.md)).
+</details>
 
 ---
 
 <details>
 <summary>🇸🇦 <b>بالعربي باختصار</b></summary>
 
-**ملفات البرنامج** (من صفحة [آخر إصدار](https://github.com/2B-4G10/Xbloom-Panel/releases/latest)):
-- **`UPDATE-WiFi-or-USB`**: للتحديث عن طريق الواي فاي من **الإعدادات ← تحديث البرنامج**. إعداداتك تبقى.
-- **`FULL-USB-ONLY`**: بالكيبل فقط (أول تثبيت أو إصلاح). ⛔ لا ترفعه من صفحة تحديث الواي فاي. يمسح إعدادات الواي فاي والحساب.
-
-**التثبيت بالكيبل بدون برامج:** افتح https://espressif.github.io/esptool-js/ في كروم، اختر السرعة `115200` ثم **Connect**، والعنوان `0x0`، وملف **FULL-USB-ONLY**، ثم **Program**.
-
-**أو بأمر واحد** (يسوي نسخة احتياطية ويبني ويثبّت): انسخ أمر الماك أو الويندوز من الطريقة 3 فوق.
+- **التحديث بالواي فاي:** نزّل [ملف التحديث](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin)، ثم من اللوحة **الإعدادات ← تحديث البرنامج** وارفعه. إعداداتك تبقى.
+- **التثبيت بالكيبل بدون برامج:** نزّل [ملف الكيبل](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin)، افتح https://espressif.github.io/esptool-js/ في كروم، السرعة `115200` ثم **Connect**، العنوان `0x0`، ثم **Program**. ⛔ لا ترفعه من صفحة الواي فاي.
+- **أو بأمر واحد:** انسخ أمر الماك أو الويندوز من الطريقة 3 فوق، ونفس الأمر للتحديث لاحقاً.
 </details>
 
 <div align="center">
