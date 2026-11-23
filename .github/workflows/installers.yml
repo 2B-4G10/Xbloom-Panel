@@ -1,5 +1,5 @@
 # Runs the README's one-command installers, exactly as written there, on fresh
-# Windows and Mac machines: sign-in check, download, every tool they install, and the
+# Windows and Mac machines: download, every tool they install, and the
 # firmware build. (No panel is plugged in, so they stop after the build: XBP_BUILD_ONLY.)
 name: Installer test
 
@@ -32,7 +32,6 @@ jobs:
       - name: Run the README's Windows command
         shell: powershell
         run: |
-          gh auth setup-git   # what answering "Yes" at sign-in does for a person
           New-Item -ItemType Directory -Force ([Environment]::GetFolderPath('Desktop')) | Out-Null
           $readme = Get-Content readme\README.md -Raw
           $cmd = [regex]::Match($readme, '(?s)```powershell\r?\n(.*?)\r?\n```').Groups[1].Value
@@ -57,7 +56,6 @@ jobs:
           sparse-checkout: README.md
       - name: Run the README's Mac command
         run: |
-          gh auth setup-git
           mkdir -p ~/Desktop
           cmd=$(awk '/^```bash$/{f=1;next} /^```$/{if(f)exit} f' readme/README.md | head -1)
           [ -n "$cmd" ] || { echo "No Mac command in README.md"; exit 1; }
