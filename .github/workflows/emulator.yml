@@ -88,4 +88,5 @@ jobs:
           path: |
             emulator-out/
             serial.log
+            .pio/build/emulator/firmware.elf
           if-no-files-found: warn

@@ -442,8 +442,9 @@ void call(const char *what) {
     ESP.restart();
   } else if (!strcmp(what, "finish")) {
     emu_prefs.putInt("phase", 0);
-    Serial.printf("[mem] internal free %u, PSRAM free %u\n", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    Serial.printf("[mem] internal free %u, PSRAM free %u, loop stack unused %u\n",
+                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM), (unsigned)uxTaskGetStackHighWaterMark(nullptr));
     Serial.printf("[emu] RESULT %d passed, %d failed\n", passed, failed);
     Serial.println(failed ? "[emu] FAILED" : "[emu] PASSED");
     Serial.flush();
@@ -592,6 +593,7 @@ void tick() {
 }
 
 void shot(const char *name) {
+  Serial.printf("[emu] picture %s\n", name);
   lv_refr_now(nullptr);
   const uint16_t *px = finished;
   const int n = LCD_H_RES * LCD_V_RES;

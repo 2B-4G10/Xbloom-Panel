@@ -239,6 +239,10 @@ void tls_free(void *p) { heap_caps_free(p); }
 
 }  // namespace
 
+#ifdef XB_EMULATOR
+SET_LOOP_TASK_STACK_SIZE(16 * 1024);  // QEMU's slower timing lets more LVGL work pile into one call
+#endif
+
 extern "C" bool verifyRollbackLater() { return true; }  // Arduino: we confirm updates ourselves
 
 void setup() {
@@ -264,10 +268,10 @@ void setup() {
 #ifdef XB_EMULATOR
   emulator::begin();
 #endif
-  Serial.printf("[mem] internal free %u, largest block %u, PSRAM free %u\n",
+  Serial.printf("[mem] internal free %u, largest block %u, PSRAM free %u, loop stack unused %u\n",
                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+                (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM), (unsigned)uxTaskGetStackHighWaterMark(nullptr));
   while (millis() - logo_since < BOOT_LOGO_MS) delay(10);
   Serial.println("ready");
 }
