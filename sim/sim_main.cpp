@@ -59,6 +59,18 @@ int main(int argc, char **argv) {
     ui::sim_show(13, 0); run(400); save("st_clock.ppm");
     return 0;
   }
+  if (argc > 1 && !strcmp(argv[1], "emoji")) {
+    ev(UiEvType::Link, 3, 0, "XBLOOM 381"); run(500);
+    int berry = ui::sim_find("🍓 Berry Bomb");
+    ui::sim_show(31, 0); run(800); save("em_starters.ppm");
+    ui::sim_show(2, berry); run(800); save("em_detail.ppm");
+    ui::sim_show(15, berry); run(800); save("em_editor.ppm");
+    ui::sim_show(33, berry); run(800); save("em_text_entry.ppm");
+    ui::sim_show(34, berry); run(100);
+    ui::sim_show(32, 0); run(800); save("em_test.ppm");
+    ui::sim_show(22, berry); run(2600); save("em_finish.ppm");
+    return 0;
+  }
   if (argc > 1 && !strcmp(argv[1], "detail")) {
     ev(UiEvType::Link, 3, 0, "XBLOOM 381"); run(500);
     ui::sim_show(1, 0); run(800); save("d0_recipes.ppm");

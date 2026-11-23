@@ -23,6 +23,9 @@
 /* QR codes on the Double Shot page (store + WhatsApp links) */
 #define LV_USE_QRCODE 1
 
+/* Colour emoji are image glyphs (src/emoji.cpp) */
+#define LV_USE_IMGFONT 1
+
 #define LV_USE_PERF_MONITOR 0
 #define LV_USE_MEM_MONITOR 0
 #endif

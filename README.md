@@ -20,6 +20,8 @@ Firmware for an **Elecrow CrowPanel Advance 4.3″** touchscreen that sits next 
 | | |
 |---|---|
 | ☕ **Brew your recipes** | Your xBloom account's recipes (Created and Shared) on the panel. Load, start, pause and stop, with a live dot-matrix brewing scene. |
+| 🍓 **Eight starter recipes** | Daily Pour Over, Light and Dark Roast, plus 🍓 Berry Bomb, 🍫 Chocolate Hug, 🍯 Honey Morning, 🧊 Iced Sunrise and 😋 Sweet Spot, always under Recipes → Starter. |
+| 😋 **Emoji** | Every emoji in colour: skin tones, families, professions, keycaps and flags, in recipe names and everywhere else. |
 | ✏️ **Edit on the panel** | Change or create recipes right on the screen. Edits sync back to your account. |
 | ⚙️ **Grinder, Brewer, Scale** | The machine's manual modes, with drag-to-set controls, a timer and tare. |
 | 🌐 **English or العربية** | Full Arabic with right-to-left screens. Choose Arabic numbers and units (٨٠ مل) or English ones (80 ml). |
@@ -183,11 +185,13 @@ Where things are:
 | `src/ui.cpp` | every screen (the store page is `build_store()`) |
 | `src/dotfx.cpp` | the dot-matrix clock and brewing scenes |
 | `src/i18n.cpp` | the Arabic translations |
+| `src/emoji.cpp` | colour emoji (images in `src/emoji_data.c`, made by `tools/emoji/make_emoji.py`) |
+| `include/recipes.h` | the starter recipes |
 | `src/xbloom_protocol.cpp` | the machine's Bluetooth protocol |
 | `src/library.cpp`, `src/cloud.cpp` | recipes and the xBloom account |
 | `src/boot_logo.c` | the boot logo |
-| `sim/` | previews every screen on a computer (`SIM_LANG=ar` for Arabic) |
-| `test_native/run.sh` | checks the protocol, recipe and encryption code against an earlier version |
+| `sim/` | previews every screen on a computer (`SIM_LANG=ar` for Arabic, `sim emoji` for the emoji screens) |
+| `test_native/run.sh` | checks the protocol, recipe and encryption code against an earlier version, and every emoji |
 </details>
 
 ---

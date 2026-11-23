@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "emoji.h"
 #include "i18n.h"
 #include "ui_theme.h"
 
@@ -43,10 +44,10 @@ uint32_t blend(uint32_t a, uint32_t b, float k) {
   return ((uint32_t)(ar + (br - ar) * k) << 16) | ((uint32_t)(ag + (bg - ag) * k) << 8) | (uint32_t)(ab + (bb - ab) * k);
 }
 
-// Labels show their text in the panel's language, Arabic digits and units included.
+// Labels show their text in the panel's language, emoji and Arabic digits and units included.
 void set_label(lv_obj_t *l, const char *text) {
-  static char buf[128];
-  lv_label_set_text(l, i18n::localize(i18n::tr(text), buf, sizeof buf));
+  static char with_emoji[128], buf[128];
+  lv_label_set_text(l, i18n::localize(emoji::map(i18n::tr(text), with_emoji, sizeof with_emoji), buf, sizeof buf));
 }
 
 lv_obj_t *label(lv_obj_t *parent, const lv_font_t *font, uint32_t color) {

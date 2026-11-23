@@ -1,4 +1,4 @@
-// Recipes built into the firmware: three starters, always under Recipes > Starter.
+// Recipes built into the firmware: the starters, always under Recipes > Starter.
 // Everything else comes from the owner's xBloom account or is made on the panel.
 #pragma once
 #include <string.h>
@@ -73,6 +73,25 @@ inline std::vector<PanelRecipe> starters() {
         {P(50, 96, PAT_CENTERED, 35), P(105, 96, PAT_SPIRAL, 10), P(100, 96, PAT_SPIRAL, 0, false, 3.5)}),
       R("Dark Roast", CUP_OTHER, 16, 52, 80, 0xE6C3A0, KIND_STARTER, false,
         {P(40, 88, PAT_CENTERED, 30), P(100, 88, PAT_CIRCULAR, 10), P(100, 88, PAT_CIRCULAR, 0)}),
+
+      // Flavour-first recipes.
+      // Fruity natural or anaerobic beans: hot, fine and in small pours to lift the berries.
+      R("🍓 Berry Bomb", CUP_OTHER, 15, 40, 100, 0xF2A7B5, KIND_STARTER, false,
+        {P(45, 95, PAT_CENTERED, 40, true), P(65, 95, PAT_SPIRAL, 15), P(65, 95, PAT_SPIRAL, 15),
+         P(65, 95, PAT_SPIRAL, 0, false, 3.5)}),
+      // Chocolatey medium-dark beans: cooler, coarser and fewer pours for a heavy, round cup.
+      R("🍫 Chocolate Hug", CUP_OTHER, 16, 54, 80, 0xC9A27E, KIND_STARTER, false,
+        {P(40, 90, PAT_CENTERED, 35), P(100, 90, PAT_CIRCULAR, 15), P(100, 90, PAT_CIRCULAR, 0)}),
+      // Washed medium roast: a long bloom and a slow middle pour for sweetness.
+      R("🍯 Honey Morning", CUP_OTHER, 15, 47, 90, 0xF0C674, KIND_STARTER, false,
+        {P(50, 92, PAT_CENTERED, 45, true), P(90, 92, PAT_SPIRAL, 15), P(90, 92, PAT_CIRCULAR, 0)}),
+      // Iced pour over: brew strong onto about 120 g of ice in the carafe.
+      R("🧊 Iced Sunrise", CUP_OTHER, 20, 38, 100, 0xA8D8F0, KIND_STARTER, false,
+        {P(50, 94, PAT_CENTERED, 40, true), P(70, 94, PAT_SPIRAL, 15), P(60, 94, PAT_SPIRAL, 0)}),
+      // Any beans, everyday sweetness: balanced 1:16 in four even pours.
+      R("😋 Sweet Spot", CUP_OTHER, 15, 46, 90, 0xE8B4D8, KIND_STARTER, false,
+        {P(45, 93, PAT_CENTERED, 35), P(65, 93, PAT_SPIRAL, 10), P(65, 93, PAT_SPIRAL, 10),
+         P(65, 93, PAT_CIRCULAR, 0)}),
   };
 }
 

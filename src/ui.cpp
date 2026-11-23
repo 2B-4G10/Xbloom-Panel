@@ -20,6 +20,7 @@
 #include "ble_link.h"
 #include "cloud.h"
 #include "dotfx.h"
+#include "emoji.h"
 #include "i18n.h"
 #include "panel_net.h"
 #include "panel_storage.h"
@@ -102,13 +103,14 @@ void refit(lv_obj_t *l);
 // ============================================================================
 // Text
 // ============================================================================
-// Every label goes through here: the text is translated, given Arabic digits and
+// Every label goes through here: the text is translated, its emoji made drawable
+// (include/emoji.h), given Arabic digits and
 // units when chosen, and only handed to LVGL when it actually changed (each change
 // redraws, and redraws share PSRAM bandwidth with the display; redrawing the clock
 // and status bar several times a second caused line glitches).
 void set_text(lv_obj_t *l, const char *t) {
-  static char localized[256];
-  t = i18n::localize(tr(t), localized, sizeof localized);
+  static char with_emoji[256], localized[256];
+  t = i18n::localize(emoji::map(tr(t), with_emoji, sizeof with_emoji), localized, sizeof localized);
   const char *now = lv_label_get_text(l);
   if (now && t && strcmp(now, t) == 0) return;
   lv_label_set_text(l, t);
@@ -1129,8 +1131,8 @@ TextDone te_done = nullptr;
 lv_obj_t *te_back_to = nullptr, *te_show_btn, *te_action_lbl;
 
 void te_submit(lv_event_t *) {
-  char entered[96];
-  strlcpy(entered, lv_textarea_get_text(pw_ta), sizeof entered);
+  char entered[192];
+  emoji::unmap(lv_textarea_get_text(pw_ta), entered, sizeof entered);  // emoji as they were written
   if (te_done) te_done(entered);
 }
 
@@ -1232,13 +1234,24 @@ void build_text_entry() {
   lv_obj_add_event_cb(kb, [](lv_event_t *) { load(te_back_to, Anim::PopRight); }, LV_EVENT_CANCEL, nullptr);
 }
 
+// Drops a character cut in half at the end of `s` (after copying into a short buffer).
+void utf8_trim(char *s) {
+  size_t n = strlen(s), lead = n;
+  while (lead && ((uint8_t)s[lead - 1] & 0xC0) == 0x80) lead--;
+  if (!lead) return;
+  const uint8_t c = s[lead - 1];
+  const size_t need = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+  if (n - (lead - 1) < need) s[lead - 1] = 0;
+}
+
 // Opens the keyboard screen. `done` gets the text; Back returns to `back_to`.
 // Secret text (passwords) is hidden, with a Show / Hide button.
 void open_text_entry(const char *title, const char *initial, const char *placeholder, bool secret,
                      const char *action, lv_obj_t *back_to, TextDone done, int max_len = 63) {
   set_text(pw_title, title);
   lv_textarea_set_max_length(pw_ta, max_len);
-  lv_textarea_set_text(pw_ta, initial);
+  static char shown[256];
+  lv_textarea_set_text(pw_ta, emoji::map(initial, shown, sizeof shown));
   lv_textarea_set_placeholder_text(pw_ta, tr(placeholder));
   lv_textarea_set_password_mode(pw_ta, secret);
   set_text(pw_show_lbl, "Show");
@@ -1687,6 +1700,7 @@ void build_pours_chart(const PanelRecipe &p) {
     lv_obj_set_flex_flow(pattern_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(pattern_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(pattern_row, 6, 0);
+    lv_obj_set_style_base_dir(pattern_row, LV_BASE_DIR_LTR, 0);  // icon then temperature, centred, in any language
     pattern_icon(pattern_row, pour.pattern, 18, hex(0xDDDDDD));
     snprintf(s, sizeof s, "%.0f°C", pour.temp_c);
     text(pattern_row, s, &inter_16, hex(SUB));
@@ -2409,6 +2423,7 @@ void build_editor() {
   on_click(name_box, [](lv_event_t *) {
     open_text_entry("Recipe name", ed.r.name, "Name", false, "Done", scr_edit, [](const char *t) {
       strlcpy(ed.r.name, t, sizeof ed.r.name);
+      utf8_trim(ed.r.name);
       refresh_editor();
       load(scr_edit, Anim::PopRight);
     });
@@ -3004,6 +3019,12 @@ bool take_wake() {
 }
 
 #ifdef UI_SIM
+int sim_find(const char *name) {
+  for (size_t i = 0; i < lib.size(); i++)
+    if (!strcmp(lib[i].r.name, name)) return (int)i;
+  return 0;
+}
+
 // Desktop preview: jump straight to a screen or state (see sim/sim_main.cpp).
 void sim_show(int which, int recipe) {
   const uint32_t uid = lib[recipe].uid;
@@ -3047,6 +3068,30 @@ void sim_show(int which, int recipe) {
     case 28: open_store(nullptr); break;
     case 29: close_store(nullptr); break;
     case 30: lv_screen_load(scr_home); set_tab(2); lv_dropdown_open(st_lang_dd); break;
+    case 31: lv_screen_load(scr_home); set_tab(1); set_seg(2); break;  // the starters
+    case 32: {  // emoji test card: every kind, in each text size
+      lv_obj_t *scr = new_screen(BG);
+      static const char *const lines[] = {
+          "Faces 😀😋🥹🫠🤌 hearts ❤️🧡💛 ☕️🍓🍫🍯🧊",
+          "Tones 👍🏻👍🏽👍🏿 👩🏽‍💻 🧑🏾‍🍳 👨‍👩‍👧‍👦 🏳️‍🌈 🏴‍☠️",
+          "Keycaps 1️⃣#️⃣ flags 🇸🇦🇯🇵🇺🇸 🏴󠁧󠁢󠁳󠁣󠁴󠁿 ©️ new 🫨🪿🪼",
+          "Plain text stays: # 1 © ® 2026",
+          "قهوة ☕ مع 🍓 وتمر 🌴"};
+      const lv_font_t *fonts[] = {&inter_14, &inter_16, &inter_20, &inter_26b, &inter_34b};
+      int y = 16;
+      for (int i = 0; i < 5; i++) {
+        lv_obj_t *l = text(scr, lines[i], fonts[i], hex(TEXT));
+        if (i == 4) lv_obj_set_style_base_dir(l, LV_BASE_DIR_AUTO, 0);
+        lv_obj_set_pos(l, 16, y);
+        y += i < 2 ? 40 : 56;
+      }
+      lv_screen_load(scr);
+      break;
+    }
+    case 33: open_editor(uid); open_text_entry("Recipe name", lib[recipe].r.name, "Name", false, "Done", scr_edit,
+                                                [](const char *t) { printf("entered: %s\n", t); });
+             break;
+    case 34: te_submit(nullptr); break;
   }
 }
 #endif
