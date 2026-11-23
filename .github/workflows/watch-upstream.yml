@@ -1,0 +1,100 @@
+# Watches the original project (Mesh-one/Xbloom-panel) for new changes and reports them for
+# review. Nothing is ever merged automatically.
+#
+# Every Sunday it compares upstream with the last reviewed upstream commit
+# (.github/upstream-reviewed.sha). If there are new commits, the run summary lists them with the
+# files they touch, the full diff is attached to the run as "upstream-changes", and the run is
+# marked failed so GitHub emails the repo owner. It repeats weekly until they're reviewed.
+#
+# After reviewing: Actions → "Watch the original repo" → Run workflow → tick
+# "Mark the current upstream as reviewed". That records the new position.
+name: Watch the original repo
+
+on:
+  schedule:
+    - cron: "23 3 * * 0"   # weekly: Sunday 03:23 UTC (06:23 Riyadh)
+  workflow_dispatch:
+    inputs:
+      mark_reviewed:
+        description: Mark the current upstream as reviewed
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # only used to record "reviewed"
+
+concurrency:
+  group: writes-to-main
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: https://github.com/Mesh-one/Xbloom-panel.git
+  UPSTREAM_BRANCH: main
+  STATE: .github/upstream-reviewed.sha
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Compare with the last reviewed upstream commit
+        id: cmp
+        run: |
+          git init -q /tmp/up && cd /tmp/up
+          git fetch -q "$UPSTREAM" "$UPSTREAM_BRANCH"
+          LAST=$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/$STATE")
+          NEW=$(git rev-parse FETCH_HEAD)
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          if [ "$LAST" = "$NEW" ]; then
+            echo "✓ No new upstream changes since ${LAST:0:7}." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "changes=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          N=$(git rev-list --count "$LAST..$NEW")
+          {
+            echo "### 🔎 $N new upstream commit(s) to review"
+            echo "Mesh-one/Xbloom-panel \`${LAST:0:7}\` → \`${NEW:0:7}\` · [compare on GitHub](https://github.com/Mesh-one/Xbloom-panel/compare/$LAST...$NEW)"
+            echo
+            git log --reverse --format="- **%s** (%h, %ad)" --date=short "$LAST..$NEW"
+            echo
+            echo "**Files changed:**"
+            echo '```'
+            git diff --stat "$LAST" "$NEW"
+            echo '```'
+            echo "The full diff is attached to this run as **upstream-changes**. Nothing was merged."
+            echo "After review: Run workflow → tick **Mark the current upstream as reviewed**."
+          } >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p "$RUNNER_TEMP/upstream-changes"
+          git log --reverse --format='commit %H%nDate: %ad%n%n    %s%n' "$LAST..$NEW" > "$RUNNER_TEMP/upstream-changes/commits.txt"
+          git diff "$LAST" "$NEW" > "$RUNNER_TEMP/upstream-changes/changes.diff"
+          echo "changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Attach the full diff
+        if: steps.cmp.outputs.changes == 'true' && !inputs.mark_reviewed
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-changes
+          path: ${{ runner.temp }}/upstream-changes/
+
+      - name: Record the current upstream as reviewed
+        if: steps.cmp.outputs.changes == 'true' && inputs.mark_reviewed
+        env:
+          NEW: ${{ steps.cmp.outputs.new }}
+        run: |
+          echo "$NEW" > "$STATE"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$STATE"
+          git commit -q -m "Mark Mesh-one/Xbloom-panel@${NEW:0:7} as reviewed"
+          git push -q origin HEAD:main || { git pull -q --rebase origin main && git push -q origin HEAD:main; }
+          echo "✓ Recorded ${NEW:0:7} as reviewed; the weekly check starts from there." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # A failed run is what makes GitHub email the owner, so new changes don't go unnoticed.
+      - name: Flag new changes for review
+        if: steps.cmp.outputs.changes == 'true' && !inputs.mark_reviewed
+        run: |
+          echo "::error::The original repo has new changes to review. See the run summary; nothing was merged."
+          exit 1
