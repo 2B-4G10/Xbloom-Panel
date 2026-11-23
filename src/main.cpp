@@ -251,6 +251,7 @@ void setup() {
   Serial.printf("\nxBloom Panel %s starting\n", FW_VERSION);
 #ifdef XB_EMULATOR
   emulator::start_display();
+  emulator::start_network();
 #else
   start_board();
   start_display();
