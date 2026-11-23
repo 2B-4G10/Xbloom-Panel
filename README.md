@@ -31,7 +31,7 @@ Firmware for an **Elecrow CrowPanel Advance 4.3″** touchscreen that sits next 
   <img alt="Double Shot tab" src="docs/images/store-page.png" width="400">
 </div>
 
-> Unofficial: not affiliated with xBloom. The idea comes from [xBloom Panel by Mansour Alshekhi](https://github.com/Mesh-one/Xbloom-panel); this firmware is Double Shot's own code.
+> Unofficial: not affiliated with xBloom.
 
 ---
 
@@ -168,31 +168,6 @@ Use **Method 2**, but choose your backup file (in `Desktop/xBloom-backups`) inst
 | **Monday** | Dependabot updates the build automation. Each update is test-built and merged automatically if it passes. |
 | **Tuesday** | The ESP32 platform is updated with its matching build tool, test-built first and added only if it passes. A platform version that doesn't build yet is skipped and noted in `.github/essentials-hold.txt`. |
 | **Wednesday** | If anything changed that week, a new [release](https://github.com/2B-4G10/Xbloom-Panel/releases) is published with both `.bin` files and a [changelog](CHANGELOG.md). |
-
-<details>
-<summary>🧑‍💻 Building by hand</summary>
-
-```bash
-python3 -m venv ~/.platformio/penv                              # Python 3.10–3.14
-~/.platformio/penv/bin/pip install -r requirements-build.txt   # build tools
-~/.platformio/penv/bin/pio run                                 # first build takes a while
-```
-
-Where things are:
-
-| | |
-|---|---|
-| `src/ui.cpp` | every screen (the store page is `build_store()`) |
-| `src/dotfx.cpp` | the dot-matrix clock and brewing scenes |
-| `src/i18n.cpp` | the Arabic translations |
-| `src/emoji.cpp` | colour emoji (images in `src/emoji_data.c`, made by `tools/emoji/make_emoji.py`) |
-| `include/recipes.h` | the starter recipes |
-| `src/xbloom_protocol.cpp` | the machine's Bluetooth protocol |
-| `src/library.cpp`, `src/cloud.cpp` | recipes and the xBloom account |
-| `src/boot_logo.c` | the boot logo |
-| `sim/` | previews every screen on a computer (`SIM_LANG=ar` for Arabic, `sim emoji` for the emoji screens) |
-| `test_native/run.sh` | checks the protocol, recipe and encryption code against an earlier version, and every emoji |
-</details>
 
 ---
 
