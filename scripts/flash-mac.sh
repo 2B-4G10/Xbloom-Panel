@@ -119,8 +119,12 @@ if [[ -d "$DIR/.git" ]]; then
     git -C "$DIR" stash push -q -m "xbp installer auto-stash $(date +%F-%H%M)"
     warn "You had local edits in $DIR — saved them with 'git stash' (git stash list to see them)."
   fi
-  git -C "$DIR" checkout -q main
-  git -C "$DIR" pull -q --ff-only
+  # Always the exact published code, even if this copy's history no longer matches
+  # (local edits were stashed just above).
+  git -C "$DIR" remote set-url origin "$REPO_URL"
+  git -C "$DIR" fetch -q origin main || die "Couldn't download the latest code. Check the internet connection and run again."
+  git -C "$DIR" checkout -q -B main origin/main
+  git -C "$DIR" reset -q --hard origin/main
 else
   git clone -q "$REPO_URL" "$DIR"
 fi
