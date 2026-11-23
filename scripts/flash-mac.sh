@@ -5,8 +5,7 @@
 # Python 3.10–3.14, PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the
 # panel, backs up its current firmware if asked (XBP_BACKUP=1), builds this repo and flashes it.
 #
-# Run (the repo is private, so sign in with the GitHub CLI first; see README, Method 3):
-#   (see README: signs in to GitHub once, then clones 2B-4G10/Xbloom-Panel to ~/Xbloom-Panel)
+# Run (README, Method 3), or again later:  bash ~/Xbloom-Panel/scripts/flash-mac.sh
 #
 # Options (environment variables):
 #   XBP_PORT=/dev/cu.xxx   use this serial port instead of auto-detecting

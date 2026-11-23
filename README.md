@@ -39,18 +39,17 @@ Firmware for an **Elecrow CrowPanel Advance 4.3″** touchscreen that sits next 
 
 - 🖥️ **Elecrow CrowPanel Advance 4.3″** (the **Advance** 800×480 model): [AliExpress](https://a.aliexpress.com/_c3srIHtH) · [Elecrow](https://www.elecrow.com/crowpanel-advance-4-3-hmi-esp32-800x480-ai-display-ips-touch-artificial-intelligent-screen.html)
 - 🔌 **A USB-C cable that carries data.** Charge-only cables won't work.
-- 🔑 **Access to this repository.** It is private, so sign in to GitHub with an account that has been given access.
 
 ---
 
 ## 📦 The two firmware files
 
-Download them from the [**latest release**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest). Each name tells you how to install it:
+Tap to download the newest version (no sign-in needed), or see the [**latest release**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest). Each name tells you how to install it:
 
 | File | Install it with | Your settings |
 |---|---|---|
-| 🛜 `xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin` | **Wi-Fi** from the panel's settings (Method 1) | ✅ Kept |
-| 🔌 `xbloom-panel-doubleshot-FULL-USB-ONLY.bin` | **USB cable only** (Method 2) | ⚠️ Wi-Fi and xBloom login reset |
+| 🛜 [**`xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin`**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin) | **Wi-Fi** from the panel's settings (Method 1) | ✅ Kept |
+| 🔌 [**`xbloom-panel-doubleshot-FULL-USB-ONLY.bin`**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin) | **USB cable only** (Method 2) | ⚠️ Wi-Fi and xBloom login reset |
 
 > ⛔ **Never upload the FULL-USB-ONLY file on the Wi-Fi update page.** It only works over USB.
 
@@ -60,7 +59,7 @@ Download them from the [**latest release**](https://github.com/2B-4G10/Xbloom-Pa
 
 ### 1️⃣ Wi-Fi update: easiest, if the panel already runs xBloom Panel
 
-1. Download **`xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin`** from the [latest release](https://github.com/2B-4G10/Xbloom-Panel/releases/latest) to your phone or computer.
+1. Download [**`xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin`**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin) to your phone or computer.
 2. On the panel, go to **Settings → Software update**.
 3. Open the address the panel shows (on a phone or computer on the same Wi-Fi), choose the file, and upload it.
 4. The panel restarts with the new firmware. Your settings stay. 🎉
@@ -69,7 +68,7 @@ Download them from the [**latest release**](https://github.com/2B-4G10/Xbloom-Pa
 
 Use this for a new panel, or to recover one.
 
-1. Download **`xbloom-panel-doubleshot-FULL-USB-ONLY.bin`** from the [latest release](https://github.com/2B-4G10/Xbloom-Panel/releases/latest).
+1. Download [**`xbloom-panel-doubleshot-FULL-USB-ONLY.bin`**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin).
 2. Connect the panel to your computer with the USB-C cable.
 3. In **Chrome** or **Edge**, open Espressif's web flasher: **https://espressif.github.io/esptool-js/**
 4. Set **Baudrate** to `115200`, click **Connect**, and pick the panel's port. On a Mac it's named `wchusbserial…`.
@@ -80,25 +79,22 @@ Use this for a new panel, or to recover one.
 
 ### 3️⃣ One command: builds from source
 
-> [!IMPORTANT]
-> The project is private. You need a free [GitHub account](https://github.com/signup) that **Double Shot has invited** to `2B-4G10/Xbloom-Panel` (accept the invite from your email first). Without it, the download step stops with a message saying so.
-
 This method installs everything it needs, builds the latest code and flashes it. Your settings are kept. The first run takes 30–60 minutes, mostly waiting for the build ☕.
 
 **🍎 Mac.** Open **Terminal** and paste:
 
 ```bash
-brew install gh && { gh auth status >/dev/null 2>&1 || gh auth login -h github.com -p https -w; } && { [ -d ~/Xbloom-Panel/.git ] || gh repo clone 2B-4G10/Xbloom-Panel ~/Xbloom-Panel || { echo "❌ This GitHub account has no access to Xbloom-Panel yet: ask Double Shot to invite it."; false; }; } && bash ~/Xbloom-Panel/scripts/flash-mac.sh
+curl -fsSL https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/scripts/flash-mac.sh -o /tmp/xbp.sh && bash /tmp/xbp.sh
 ```
 
 **🪟 Windows.** Open **PowerShell** and paste:
 
 ```powershell
-winget install -e --id GitHub.cli --accept-source-agreements --accept-package-agreements; winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements; $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User'); gh auth status *> $null; if ($LASTEXITCODE -ne 0) { gh auth login -h github.com -p https -w }; if (-not (Test-Path "$HOME\Xbloom-Panel\.git")) { gh repo clone 2B-4G10/Xbloom-Panel "$HOME\Xbloom-Panel" }; if (Test-Path "$HOME\Xbloom-Panel\scripts\flash-windows.ps1") { powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1" } else { Write-Host 'This GitHub account has no access to Xbloom-Panel yet: ask Double Shot to invite it.' -ForegroundColor Red }
+irm https://raw.githubusercontent.com/2B-4G10/Xbloom-Panel/main/scripts/flash-windows.ps1 -OutFile "$env:TEMP\xbp.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\xbp.ps1"
 ```
 
 What happens:
-- 🔑 **Sign in to GitHub (first time only).** It shows a one-time code like `ABCD-1234`: press **Enter**, a browser opens, paste the code and approve. If it asks *Authenticate Git with your GitHub credentials?*, answer **Y**. Next time this step is skipped.
+- It downloads the project to your home folder (`Xbloom-Panel`), and updates it on later runs.
 - The script then checks and installs everything it needs: Python, the build tools, esptool and the USB driver. It explains each step as it goes.
 - Want a copy of the panel's current firmware first? Add the `XBP_BACKUP=1` option below (about 25 minutes more). You can always go back with the FULL-USB-ONLY file anyway.
 - It flashes the new firmware, and also leaves the Wi-Fi update file on your Desktop.

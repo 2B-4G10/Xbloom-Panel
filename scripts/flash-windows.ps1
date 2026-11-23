@@ -4,8 +4,7 @@
 # PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the panel, backs up
 # its current firmware if asked (XBP_BACKUP=1), builds this repo and flashes it.
 #
-# Run in PowerShell (the repo is private; sign in with the GitHub CLI first, see README, Method 3):
-#   (see README: signs in to GitHub once, then clones 2B-4G10/Xbloom-Panel to $HOME\Xbloom-Panel)
+# Run in PowerShell (README, Method 3), or again later from the downloaded project:
 #   powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1"
 #
 # Options (set before running, e.g.  $env:XBP_BACKUP = "1"):
