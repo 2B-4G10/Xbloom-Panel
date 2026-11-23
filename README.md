@@ -1,9 +1,6 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.png">
-  <img alt="By: Double Shot — Speciality Coffee / Bareista Tools" src="docs/images/logo-light.png" width="520">
-</picture>
+<img alt="By: Double Shot — Speciality Coffee / Bareista Tools" src="docs/images/logo.png" width="520">
 
 # ☕ xBloom Panel by Double Shot
 
