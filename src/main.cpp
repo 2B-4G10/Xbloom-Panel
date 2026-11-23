@@ -17,6 +17,7 @@
 #include "LovyanGFX_Driver.h"
 #include "ble_link.h"
 #include "cloud.h"
+#include "emulator.h"
 #include "panel_net.h"
 #include "pins_config.h"
 #include "ui.h"
@@ -164,7 +165,9 @@ void set_screen(Screen s) {
   ui::show_clock(s == Screen::Clock);
   uint8_t level = backlight_level(s);
   // Through LovyanGFX's I2C driver, which the touch polling also uses, so they never collide.
+#ifndef XB_EMULATOR
   lgfx::i2c::transactionWrite(I2C_NUM_0, BOARD_MCU, &level, 1, 400000);
+#endif
   static const char *const NAMES[] = {"on", "dim", "clock", "off"};
   Serial.printf("[screen] %s\n", NAMES[(int)s]);
 }
@@ -242,15 +245,25 @@ void setup() {
   mbedtls_platform_set_calloc_free(tls_calloc, tls_free);  // before any TLS connection
   Serial.begin(115200);
   Serial.printf("\nxBloom Panel %s starting\n", FW_VERSION);
+#ifdef XB_EMULATOR
+  emulator::start_display();
+#else
   start_board();
   start_display();
   start_touch_input();
+#endif
   ui::splash();
+#ifdef XB_EMULATOR
+  emulator::shot("boot_logo");
+#endif
   const uint32_t logo_since = millis();
   net::begin();  // first: it loads the saved settings the UI shows
   cloud::begin();
   ui::begin();
   ble_link::begin();
+#ifdef XB_EMULATOR
+  emulator::begin();
+#endif
   Serial.printf("[mem] internal free %u, largest block %u, PSRAM free %u\n",
                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
@@ -260,6 +273,9 @@ void setup() {
 }
 
 void loop() {
+#ifdef XB_EMULATOR
+  emulator::tick();
+#endif
   ui::tick();
   manage_screen();
   confirm_update();

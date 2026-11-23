@@ -1,0 +1,91 @@
+# Runs the firmware in Espressif's QEMU and walks through the screens: start-up,
+# Grinder, Brewer, Scale, the starters, a full brew with pause and resume, the recipe
+# editor (emoji name, save), Wi-Fi (wrong and right password), sign-in, software
+# update, the Double Shot page, the clock, emoji, and restarts into Arabic and back.
+# The xBloom Studio and Wi-Fi networks are simulated (QEMU has no radio); see
+# include/emulator.h. Screen pictures and the report are kept as the run's artifact.
+name: Emulator test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "include/**"
+      - "platformio.ini"
+      - "partitions.csv"
+      - "tools/emulator/**"
+      - ".github/workflows/emulator.yml"
+      - ".github/actions/build-firmware/**"
+  pull_request:
+    paths:
+      - "src/**"
+      - "include/**"
+      - "platformio.ini"
+  workflow_dispatch:
+
+concurrency:
+  group: emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/build-firmware
+        with:
+          environment: emulator
+
+      - name: Get Espressif's QEMU
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sudo apt-get install -y -q libslirp0 libsdl2-2.0-0 libpixman-1-0 >/dev/null
+          gh release download --repo espressif/qemu --pattern 'qemu-xtensa-softmmu-*x86_64-linux-gnu.tar.xz' --dir /tmp
+          tar -xf /tmp/qemu-xtensa-softmmu-*.tar.xz -C /tmp
+          /tmp/qemu/bin/qemu-system-xtensa --version
+
+      - name: Run the firmware
+        run: |
+          # The whole 16 MB flash: the image, then erased (0xFF) space.
+          python3 -c "import sys; d=open(sys.argv[1],'rb').read(); open('flash.bin','wb').write(d+b'\xff'*(16*1024*1024-len(d)))" \
+            dist/xbloom-panel-doubleshot-FULL-USB-ONLY.bin
+          /tmp/qemu/bin/qemu-system-xtensa -nographic -M esp32s3 -m 8M \
+            -global driver=ssi_psram,property=is_octal,value=true \
+            -global driver=ssi_psram,property=size_mbytes,value=8 \
+            -drive file=flash.bin,if=mtd,format=raw -nic user,model=open_eth \
+            -serial file:serial.log -monitor none > /dev/null 2>&1 &
+          QEMU=$!
+          # Until the script reports, the firmware crashes, or 40 minutes pass.
+          for i in $(seq 1 480); do
+            sleep 5
+            if grep -aqE '\[emu\] (PASSED|FAILED)' serial.log; then sleep 2; break; fi
+            if [ "$(grep -ac 'Guru Meditation' serial.log)" -ge 2 ]; then echo "crashing"; break; fi
+            if ! kill -0 $QEMU 2>/dev/null; then echo "QEMU stopped"; break; fi
+          done
+          kill $QEMU 2>/dev/null || true
+          grep -av '^@@' serial.log | tail -n 80
+
+      - name: Report
+        run: |
+          set +e
+          pip install -q pillow
+          python3 tools/emulator/report.py serial.log emulator-out
+          status=$?
+          cat emulator-out/report.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: emulator-screens
+          path: |
+            emulator-out/
+            serial.log
+          if-no-files-found: warn

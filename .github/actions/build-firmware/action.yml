@@ -3,6 +3,11 @@
 name: Build firmware
 description: Build the xBloom Panel firmware with the pioarduino core and collect the .bin files
 
+inputs:
+  environment:
+    description: PlatformIO environment to build (emulator = the QEMU test build)
+    default: crowpanel-advance-43
+
 outputs:
   version:
     description: FW_VERSION from platformio.ini
@@ -38,14 +43,18 @@ runs:
 
     - name: Build
       shell: bash
-      run: ~/.platformio/penv/bin/pio run -e crowpanel-advance-43
+      env:
+        PIO_ENV: ${{ inputs.environment }}
+      run: ~/.platformio/penv/bin/pio run -e "$PIO_ENV"
 
     - name: Collect the firmware files
       id: collect
       shell: bash
+      env:
+        PIO_ENV: ${{ inputs.environment }}
       run: |
         VER=$(sed -n "s/.*FW_VERSION='\"\([^\"]*\)\"'.*/\1/p" platformio.ini)
-        B=.pio/build/crowpanel-advance-43
+        B=.pio/build/$PIO_ENV
         rm -rf dist && mkdir dist
         # Names say how each file may be installed, to avoid mix-ups:
         cp "$B/firmware.bin"         dist/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin  # Wi-Fi update page (or USB at 0x10000)
