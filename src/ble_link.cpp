@@ -4,6 +4,8 @@
 //   ui --command queue--> this task --> FFE1 write, then wait for the machine's echo
 #include "ble_link.h"
 
+#ifndef XB_EMULATOR  // the emulator build simulates the machine (src/emulator.cpp)
+
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <freertos/FreeRTOS.h>
@@ -291,3 +293,5 @@ bool poll(UiEvent &e) { return xQueueReceive(to_ui, &e, 0) == pdTRUE; }
 LinkState state() { return g_link; }
 
 }  // namespace ble_link
+
+#endif  // XB_EMULATOR

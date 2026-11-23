@@ -206,6 +206,48 @@ void on_wifi_event(WiFiEvent_t ev, WiFiEventInfo_t info) {
   if (ev == ARDUINO_EVENT_WIFI_STA_GOT_IP) last_disconnect = 0;
 }
 
+#ifdef XB_EMULATOR
+// Emulator build: no radio. Simulated networks; "Home Wi-Fi" joins with the
+// password "coffee123", any other password is refused.
+void join_saved() {
+  last_disconnect = 0;
+  join_started = millis();
+  g_wifi = net::Wifi::Connecting;
+}
+
+void forget_network() {
+  {
+    Locked l;
+    g_ssid[0] = g_password[0] = g_ip[0] = 0;
+  }
+  settings.remove("ssid");
+  settings.remove("pass");
+  g_wifi = net::Wifi::Off;
+}
+
+void scan() {
+  scanning = true;
+  vTaskDelay(pdMS_TO_TICKS(800));
+  static const net::Ap FAKE[] = {{"Home Wi-Fi", -48, true}, {"Neighbour", -71, true}, {"Cafe Guest", -80, false}};
+  Locked l;
+  g_ap_count = sizeof FAKE / sizeof FAKE[0];
+  memcpy(g_aps, FAKE, sizeof FAKE);
+  scanning = false;
+}
+
+void track_connection() {
+  if (g_wifi != net::Wifi::Connecting || millis() - join_started < 1500) return;
+  Locked l;
+  if (!strcmp(g_ssid, "Home Wi-Fi") && !strcmp(g_password, "coffee123")) {
+    strlcpy(g_ip, "192.168.1.50", sizeof g_ip);
+    g_wifi = net::Wifi::Connected;
+    Serial.printf("[wifi] (simulated) connected, %s\n", g_ip);
+  } else {
+    g_wifi = net::Wifi::WrongPassword;
+    Serial.println("[wifi] (simulated) wrong password");
+  }
+}
+#else
 void join_saved() {
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(HOST);
@@ -293,6 +335,7 @@ void track_connection() {
     else if (reason == WIFI_REASON_NO_AP_FOUND) g_wifi = net::Wifi::NotFound;
   }
 }
+#endif  // XB_EMULATOR
 
 void task(void *) {
   for (;;) {
@@ -329,9 +372,13 @@ void begin() {
   strlcpy(g_ssid, settings.getString("ssid", "").c_str(), sizeof g_ssid);
   strlcpy(g_password, settings.getString("pass", "").c_str(), sizeof g_password);
   snprintf(g_host, sizeof g_host, "%s.local", HOST);
+#ifndef XB_EMULATOR
   WiFi.onEvent(on_wifi_event);
   if (g_ssid[0]) want_join = true;
   else WiFi.mode(WIFI_OFF);
+#else
+  if (g_ssid[0]) want_join = true;
+#endif
   xTaskCreatePinnedToCore(task, "net", 8192, nullptr, 2, nullptr, 0);
 }
 
