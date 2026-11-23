@@ -183,6 +183,6 @@ Use **Method 2**, but choose your backup file (in `Desktop/xBloom-backups`) inst
 
 ---
 
-Made with ☕ by **Double Shot** · MIT licensed (`LICENSE`) · credits and third-party licences: `THIRD_PARTY_NOTICES.md`
+Made with ☕ by **Double Shot** · © Double Shot, all rights reserved ([`LICENSE`](LICENSE)) · credits and third-party licences: `THIRD_PARTY_NOTICES.md`
 
 </div>
