@@ -3,7 +3,7 @@
 #
 # Checks and installs everything it needs (Xcode command-line tools, Homebrew,
 # Python 3.10–3.14, PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the
-# panel, backs up its current firmware, builds this repo and flashes it.
+# panel, backs up its current firmware if asked (XBP_BACKUP=1), builds this repo and flashes it.
 #
 # Run (the repo is private, so sign in with the GitHub CLI first; see README, Method 3):
 #   (see README: signs in to GitHub once, then clones 2B-4G10/Xbloom-Panel to ~/Xbloom-Panel)
@@ -11,7 +11,7 @@
 # Options (environment variables):
 #   XBP_PORT=/dev/cu.xxx   use this serial port instead of auto-detecting
 #   XBP_BAUD=115200        serial speed (115200 is the reliable default)
-#   XBP_NO_BACKUP=1        skip the backup step
+#   XBP_BACKUP=1           also back up the panel first (about 25 minutes; off by default)
 #   XBP_BUILD_ONLY=1       build the update file but don't flash
 #   XBP_DIR=~/Xbloom-Panel where the source is kept
 set -euo pipefail
@@ -175,7 +175,7 @@ if [[ -z "${XBP_BUILD_ONLY:-}" && -z "$PORT" ]]; then
   ok "ESP32-S3 found${MAC:+ (MAC $MAC)}"
 
   # ---------------------------------------------------------------------------
-  if [[ -z "${XBP_NO_BACKUP:-}" ]]; then
+  if [[ -n "${XBP_BACKUP:-}" && -z "${XBP_NO_BACKUP:-}" ]]; then
     step "Backing up the panel's current firmware (about 25 minutes at $BAUD baud)"
     mkdir -p "$BACKUP_DIR"
     EXISTING="$(ls -t "$BACKUP_DIR"/*"${MAC:-}"*.bin "$HOME"/Desktop/xbloom-backup-*.bin 2>/dev/null | head -1 || true)"
@@ -213,7 +213,7 @@ step "Flashing the panel (a few minutes)"
 # Same four pieces 'pio run -t upload' writes. Wi-Fi and xBloom login (NVS) are left alone.
 "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" write-flash \
   0x0 "$B/bootloader.bin" 0x8000 "$B/partitions.bin" 0xe000 "$BOOT_APP0" 0x10000 "$B/firmware.bin" \
-  || die "Flash failed. The panel may be half-written: run this script again, or restore your backup (see README)."
+  || die "Flash failed. The panel may be half-written: just run this script again (see README, Troubleshooting)."
 
 printf '\n%s🎉 Done! The panel is restarting with the Double Shot boot logo.%s\n' "$grn$bold" "$rst"
-printf '%s   Backup: %s   ·   Update file: %s%s\n' "$dim" "$BACKUP_DIR" "$UPDATE_BIN" "$rst"
+printf '%s   Update file: %s%s%s\n' "$dim" "$UPDATE_BIN" "${XBP_BACKUP:+   ·   Backup: $BACKUP_DIR}" "$rst"

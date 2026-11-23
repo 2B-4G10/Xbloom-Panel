@@ -78,12 +78,12 @@ Use this for a new panel, or to recover one.
 
 > 💡 **No port shows up?** The panel's USB chip (WCH CH34x) needs a driver on some computers. **Mac:** install the [WCH driver](https://www.wch-ic.com/downloads/CH34XSER_MAC_ZIP.html), then turn it on in **System Settings → General → Login Items & Extensions → Driver Extensions**. **Windows:** install [CH341SER](https://www.wch-ic.com/downloads/CH341SER_EXE.html). Then replug the panel.
 
-### 3️⃣ One command: builds from source and backs up first
+### 3️⃣ One command: builds from source
 
 > [!IMPORTANT]
 > The project is private. You need a free [GitHub account](https://github.com/signup) that **Double Shot has invited** to `2B-4G10/Xbloom-Panel` (accept the invite from your email first). Without it, the download step stops with a message saying so.
 
-This method installs everything it needs, **backs up the panel**, builds the latest code and flashes it. Your settings are kept. The first run takes 30–60 minutes, mostly waiting ☕.
+This method installs everything it needs, builds the latest code and flashes it. Your settings are kept. The first run takes 30–60 minutes, mostly waiting for the build ☕.
 
 **🍎 Mac.** Open **Terminal** and paste:
 
@@ -100,7 +100,7 @@ winget install -e --id GitHub.cli --accept-source-agreements --accept-package-ag
 What happens:
 - 🔑 **Sign in to GitHub (first time only).** It shows a one-time code like `ABCD-1234`: press **Enter**, a browser opens, paste the code and approve. If it asks *Authenticate Git with your GitHub credentials?*, answer **Y**. Next time this step is skipped.
 - The script then checks and installs everything it needs: Python, the build tools, esptool and the USB driver. It explains each step as it goes.
-- It saves a **backup** of the panel to `Desktop/xBloom-backups` before changing anything.
+- Want a copy of the panel's current firmware first? Add the `XBP_BACKUP=1` option below (about 25 minutes more). You can always go back with the FULL-USB-ONLY file anyway.
 - It flashes the new firmware, and also leaves the Wi-Fi update file on your Desktop.
 
 On a Mac, if `brew` isn't found, install [Homebrew](https://brew.sh) first.
@@ -110,12 +110,12 @@ On a Mac, if `brew` isn't found, install [Homebrew](https://brew.sh) first.
 <details>
 <summary>⚙️ Options for the command method</summary>
 
-Put these before the command. On a Mac: `XBP_NO_BACKUP=1 bash …`. On Windows, run e.g. `$env:XBP_NO_BACKUP="1"` first.
+Put these before the command. On a Mac: `XBP_BACKUP=1 bash …`. On Windows, run e.g. `$env:XBP_BACKUP="1"` first.
 
 | Option | Effect |
 |---|---|
 | `XBP_BUILD_ONLY=1` | Only build the Wi-Fi update file; don't touch the panel |
-| `XBP_NO_BACKUP=1` | Skip the backup |
+| `XBP_BACKUP=1` | Back up the panel to `Desktop/xBloom-backups` before flashing (about 25 minutes) |
 | `XBP_PORT=…` | Use a specific port (`/dev/cu.wchusbserial110`, `COM5`) |
 | `XBP_BAUD=…` | Serial speed (default `115200`; try `57600` with a long cable) |
 
