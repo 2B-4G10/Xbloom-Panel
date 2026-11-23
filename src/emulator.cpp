@@ -7,6 +7,7 @@
 #include <Preferences.h>
 #include <esp_heap_caps.h>
 #include <lvgl.h>
+#include <misc/lv_text_ap.h>
 #include <math.h>
 #include <string.h>
 #include <sys/time.h>
@@ -176,9 +177,13 @@ void read_touch(lv_indev_t *, lv_indev_data_t *d) {
 }
 
 // The text a label shows for an English UI string.
+// (Labels keep Arabic letters in their joined forms, so the text is shaped the same way.)
 const char *shown(const char *s) {
-  static char a[160], b[160];
-  return i18n::localize(emoji::map(i18n::tr(s), a, sizeof a), b, sizeof b);
+  static char a[200], b[200], c[400];
+  const char *t = i18n::localize(emoji::map(i18n::tr(s), a, sizeof a), b, sizeof b);
+  if (_lv_text_ap_calc_bytes_count(t) >= sizeof c) return t;
+  _lv_text_ap_proc(t, c);
+  return c;
 }
 
 lv_obj_t *find_in(lv_obj_t *o, const char *text, bool want_textarea) {
@@ -200,14 +205,14 @@ lv_obj_t *find(const char *text, bool want_textarea = false) {
 }
 
 // ---- the script ----
-enum class Op { Wait, Tap, TapAny, Again, Expect, Shot, Type, Call, Mark };
+enum class Op { Wait, Tap, TapList, TapAny, Again, Expect, Shot, Type, Call, Mark };
 struct Step {
   Op op;
   const char *s;
   int ms;
 };
 
-#define BACK_SYMBOLS LV_SYMBOL_LEFT "|" LV_SYMBOL_RIGHT "|" LV_SYMBOL_DOWN
+#define BACK_SYMBOLS LV_SYMBOL_LEFT "|" LV_SYMBOL_RIGHT "|" LV_SYMBOL_DOWN "|" LV_SYMBOL_CLOSE
 
 const Step PHASE_EN[] = {
     {Op::Expect, "Grinder", 20000},
@@ -262,6 +267,7 @@ const Step PHASE_EN[] = {
     {Op::Wait, nullptr, 8000},
 
     {Op::Mark, "editor", 0},
+    {Op::Tap, "Enjoy", 1500},  // a tap closes the finished scene
     {Op::TapAny, LV_SYMBOL_EDIT, 1500},
     {Op::Shot, "en_13_editor", 0},
     {Op::Tap, "🍓 Berry Bomb", 1200},
@@ -279,12 +285,12 @@ const Step PHASE_EN[] = {
     {Op::Shot, "en_17_settings", 0},
     {Op::Tap, "Wi-Fi", 2500},
     {Op::Shot, "en_18_wifi_networks", 0},
-    {Op::Tap, "Home Wi-Fi", 1200},
+    {Op::TapList, "Home Wi-Fi", 1200},
     {Op::Type, "wrong-pass", 200},
     {Op::Tap, "Join", 200},
     {Op::Expect, "Wrong password. Tap the network to try again.", 20000},
     {Op::Shot, "en_19_wifi_wrong_password", 0},
-    {Op::Tap, "Home Wi-Fi", 1200},
+    {Op::TapList, "Home Wi-Fi", 1200},  // the list row, not the status card
     {Op::Type, "coffee123", 200},
     {Op::Tap, "Join", 200},
     {Op::Expect, "Connected\n192.168.1.50", 20000},
@@ -309,6 +315,7 @@ const Step PHASE_EN[] = {
     {Op::TapAny, BACK_SYMBOLS, 1200},
     {Op::Tap, "Double Shot", 1500},
     {Op::Shot, "en_24_store", 0},
+    {Op::TapAny, BACK_SYMBOLS, 1200},
     {Op::Tap, "xBloom", 1200},
 
     {Op::Mark, "clock", 0},
@@ -340,7 +347,7 @@ const Step PHASE_AR[] = {
     {Op::Expect, "Enjoy", 60000},
     {Op::Wait, nullptr, 2500},
     {Op::Shot, "ar_05_enjoy", 0},
-    {Op::Wait, nullptr, 8000},
+    {Op::Tap, "Enjoy", 1500},
     {Op::TapAny, BACK_SYMBOLS, 1200},
     {Op::Tap, "Settings", 1200},
     {Op::Shot, "ar_06_settings", 0},
@@ -404,6 +411,18 @@ void fail(const char *what, const char *s) {
 void pass(const char *what, const char *s) {
   passed++;
   Serial.printf("[emu] ok   %s \"%s\"\n", what, s ? s : "");
+}
+
+// The leftmost visible label showing `text` (a list row rather than a title beside it).
+void leftmost_in(lv_obj_t *o, const char *text, lv_obj_t *&best) {
+  if (lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) return;
+  if (lv_obj_check_type(o, &lv_label_class) && !strcmp(lv_label_get_text(o), text) && lv_obj_is_visible(o)) {
+    lv_area_t a, b;
+    lv_obj_get_coords(o, &a);
+    if (best) lv_obj_get_coords(best, &b);
+    if (!best || a.x1 < b.x1) best = o;
+  }
+  for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) leftmost_in(lv_obj_get_child(o, i), text, best);
 }
 
 // Finds `text` (English; shown translated), scrolling it into view if needed.
@@ -494,9 +513,11 @@ void run_script() {
       }
       break;
     case Op::Tap:
+    case Op::TapList:
     case Op::TapAny: {
       lv_obj_t *o = nullptr;
       if (s.op == Op::Tap) o = visible(s.s);
+      else if (s.op == Op::TapList) leftmost_in(lv_screen_active(), shown(s.s), o);
       else {  // any of several symbols, '|' between them
         char list[64];
         strlcpy(list, s.s, sizeof list);
@@ -508,10 +529,10 @@ void run_script() {
       if (o) {
         tap(centre(o));
         Serial.printf("[emu] tap (%d,%d)\n", (int)last_tap.x, (int)last_tap.y);
-        pass("tap", s.op == Op::Tap ? s.s : "symbol");
+        pass("tap", s.op != Op::TapAny ? s.s : "symbol");
         next(s.ms);
       } else if (millis() - step_started > 3000) {
-        fail("tap", s.op == Op::Tap ? s.s : "symbol");
+        fail("tap", s.op != Op::TapAny ? s.s : "symbol");
         emulator::shot("fail");
         next(0);
       }
