@@ -1,5 +1,5 @@
 # Builds the firmware and puts the release files in dist/. Shared by the release,
-# upstream-sync and essentials workflows so they all build the same way.
+# essentials workflows so they build the same way.
 name: Build firmware
 description: Build the xBloom Panel firmware with the pioarduino core and collect the .bin files
 

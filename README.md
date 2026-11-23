@@ -158,7 +158,7 @@ Use **Method 2**, but choose your backup file (in `Desktop/xBloom-backups`) inst
 
 | When | What happens automatically |
 |---|---|
-| **Sunday** | New fixes and features from the [original project](https://github.com/Mesh-one/Xbloom-panel) are imported. They're built first and only added if the firmware builds. If they clash with the Double Shot changes, nothing is changed and GitHub emails you that the sync needs a hand. |
+| **Sunday** | The [original project](https://github.com/Mesh-one/Xbloom-panel) is checked for new changes. Nothing is merged: if there's something new, GitHub emails you a summary to review, with the full changes attached to the run. After review, run **Watch the original repo** with **Mark the current upstream as reviewed** ticked. |
 | **Monday** | Dependabot updates the build automation. Each update is test-built and merged automatically if it passes. |
 | **Tuesday** | The ESP32 platform is updated with its matching build tool, test-built first and added only if it passes. A platform version that doesn't build yet is skipped and noted in `.github/essentials-hold.txt`. |
 | **Wednesday** | If anything changed that week, a new [release](https://github.com/2B-4G10/Xbloom-Panel/releases) is published with both `.bin` files and a [changelog](CHANGELOG.md). |

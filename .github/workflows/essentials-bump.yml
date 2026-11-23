@@ -4,8 +4,8 @@
 # platform itself declares, or the build breaks (mismatched SCons).
 #
 # The update is built first and only lands on main if the firmware builds; otherwise main
-# stays on the working version and the failed version is recorded in .github/essentials-hold.txt. Library versions (lvgl, NimBLE, ...) follow the
-# original project, via the daily upstream sync.
+# stays on the working version and the failed version is recorded in .github/essentials-hold.txt.
+# Library versions (lvgl, NimBLE, ...) are pinned in platformio.ini and updated by hand.
 name: Update build essentials
 
 on:

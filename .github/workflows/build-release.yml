@@ -2,7 +2,7 @@
 # - Pull requests (incl. Dependabot's) that touch the firmware or the build are built as a check.
 # - Every Wednesday, if anything changed since the last release, the firmware is built and a
 #   new release is published with the .bin files and a changelog. "Run workflow" does the
-#   same on demand. (Weekly schedule: Sun upstream sync · Mon Dependabot · Tue platform check
+#   same on demand. (Weekly schedule: Sun upstream watch · Mon Dependabot · Tue platform check
 #   · Wed release.)
 name: Build & release firmware
 

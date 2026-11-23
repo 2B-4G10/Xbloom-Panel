@@ -2,7 +2,7 @@
 # Each PR is test-built by build-release.yml, then merged automatically by
 # dependabot-automerge.yml once the build passes.
 # The ESP32 platform and its pioarduino core are updated together by essentials-bump.yml
-# (Dependabot can't keep them in step). Libraries follow the original project (sync-upstream.yml).
+# (Dependabot can't keep them in step). Library versions are pinned in platformio.ini.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -11,7 +11,7 @@ updates:
       - "/.github/actions/build-firmware"
     schedule:
       interval: weekly
-      day: monday          # Sun upstream sync · Mon Dependabot · Tue platform check · Wed release
+      day: monday          # Sun upstream watch · Mon Dependabot · Tue platform check · Wed release
       time: "06:00"
       timezone: Asia/Riyadh
     groups:
