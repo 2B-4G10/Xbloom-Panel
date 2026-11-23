@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.1.0-ds.17](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.0-ds.17) · 2026-11-23
+
+- Emulator build: QEMU's Ethernet card for real internet, so sign-in talks to xBloom (c806a81)
+- Emulator test: match Arabic labels in their joined forms, close the finished scene and the store page, tap list rows (250292f)
+- Emulator test: list what the screen shows when a step fails, and print every step (620aa05)
+- Emulator build: larger loop stack, stack use in the start-up log, keep the ELF for crash reports (7b42651)
+- Emulator build: declare the fonts outside the file's namespace (85dd4a7)
+- Emulator test: run the firmware in QEMU and walk through every screen (054fd7b)
+- Colour emoji and five new starter recipes (cdce6c7)
+
 ## [v4.0.0-ds.16](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.0.0-ds.16) · 2026-11-23
 
 - xBloom Panel by Double Shot 4.0.0 (a7f0dfe)
