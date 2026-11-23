@@ -125,8 +125,12 @@ if (Test-Path (Join-Path $Dir '.git')) {
     Run 'git' @('-C',$Dir,'stash','push','-q','-m',"xbp installer auto-stash $(Get-Date -Format yyyy-MM-dd-HHmm)")
     Warn "You had local edits in $Dir - saved them with 'git stash'."
   }
-  Run 'git' @('-C',$Dir,'checkout','-q','main')
-  Run 'git' @('-C',$Dir,'pull','-q','--ff-only')
+  # Always the exact published code, even if this copy's history no longer matches
+  # (local edits were stashed just above).
+  Run 'git' @('-C',$Dir,'remote','set-url','origin',$RepoUrl)
+  Run 'git' @('-C',$Dir,'fetch','-q','origin','main')
+  Run 'git' @('-C',$Dir,'checkout','-q','-B','main','origin/main')
+  Run 'git' @('-C',$Dir,'reset','-q','--hard','origin/main')
 } else {
   Run 'git' @('clone','-q',$RepoUrl,$Dir)
 }
