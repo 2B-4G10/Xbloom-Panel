@@ -146,6 +146,7 @@ if (-not $env:XBP_FRESH) {
     $wantFile = Join-Path $Home2 'release-head.bin'; [IO.File]::WriteAllBytes($wantFile, $want)
     if ((Get-FileHash $cur).Hash -eq (Get-FileHash $wantFile).Hash) {
       Write-Host "`nThe panel already runs $tag. Nothing to do." -ForegroundColor Green
+      Write-Host "    (Screen blank? Run with `$env:XBP_FRESH=`"1`" to reinstall from scratch.)" -ForegroundColor DarkGray
       return
     }
   }
@@ -174,6 +175,32 @@ foreach ($speed in $Speeds) {
 }
 if (-not $flashed) {
   Die 'Flash failed at every speed. Use a shorter data cable plugged straight into the PC, then run again.'
+}
+
+# ---------------------------------------------------------------------------
+Step 'Checking that the panel starts'
+$log = ''
+try {
+  $sp = New-Object System.IO.Ports.SerialPort $Port, 115200
+  $sp.DtrEnable = $false; $sp.RtsEnable = $false
+  $sp.Open()
+  $sp.RtsEnable = $true; Start-Sleep -Milliseconds 150; $sp.RtsEnable = $false   # restart it, as RESET does
+  $end = (Get-Date).AddSeconds(25)
+  while ((Get-Date) -lt $end -and $log -notmatch "`nready" -and $log -notmatch 'Guru Meditation|abort\(\)|Backtrace:') {
+    $log += $sp.ReadExisting(); Start-Sleep -Milliseconds 200
+  }
+  Start-Sleep -Milliseconds 800; $log += $sp.ReadExisting()
+  $sp.Close()
+} catch { Warn "Couldn't watch the panel start ($($_.Exception.Message)). Look at its screen." }
+$logFile = Join-Path $Home2 'panel-start.log'; Set-Content -Path $logFile -Value $log
+if ($log -match 'Guru Meditation|abort\(\)|Backtrace:') {
+  Write-Host ($log -split "`n" | Select-String -Pattern 'Guru|Backtrace|reason|xBloom Panel|abort' | Out-String) -ForegroundColor Yellow
+  Die "The panel crashed while starting. Send a photo of the lines above (the full log is in $logFile)."
+} elseif ($log -match "`nready") {
+  $ver = ([regex]::Match($log, 'xBloom Panel (\S+) starting')).Groups[1].Value
+  Ok "Panel started$(if ($ver) { " (version $ver)" })"
+} else {
+  Warn "Couldn't confirm the start from here. If the screen stays blank, send $logFile."
 }
 
 Write-Host "`nDone! The panel is restarting with the latest xBloom Panel by Double Shot." -ForegroundColor Green

@@ -142,6 +142,7 @@ if [[ -z "${XBP_FRESH:-}" ]]; then
   if "$ESPTOOL" --chip esp32s3 -p "$PORT" -b 115200 read-flash 0xe000 0x2100 "$WORK/installed-head.bin" >/dev/null 2>&1 \
      && dd if="$FULL" bs=4096 skip=14 2>/dev/null | head -c $((0x2100)) | cmp -s - "$WORK/installed-head.bin"; then
     printf '\n%s✓ The panel already runs %s. Nothing to do.%s\n' "$grn$bold" "${tag:-the latest version}" "$rst"
+    printf '%s   (Screen blank? Run with XBP_FRESH=1 to reinstall from scratch.)%s\n' "$dim" "$rst"
     exit 0
   fi
 fi
@@ -164,6 +165,27 @@ for speed in $SPEEDS; do
   sleep 2
 done
 [[ -n "$flashed" ]] || die "Flash failed at every speed. Use a shorter data cable plugged straight into the Mac."
+
+# ---------------------------------------------------------------------------
+step "Checking that the panel starts"
+LOG="$WORK/panel-start.log"; : >"$LOG"
+if stty -f "$PORT" 115200 raw -echo 2>/dev/null; then
+  cat "$PORT" >"$LOG" 2>/dev/null &
+  CATPID=$!
+  for _ in $(seq 1 125); do
+    sleep 0.2
+    grep -aqE '^ready|Guru Meditation|abort\(\)|Backtrace:' "$LOG" && break
+  done
+  sleep 1; kill "$CATPID" 2>/dev/null || true; wait "$CATPID" 2>/dev/null || true
+fi
+if grep -aqE 'Guru Meditation|abort\(\)|Backtrace:' "$LOG"; then
+  grep -aE 'Guru|Backtrace|reason|xBloom Panel|abort' "$LOG" || true
+  die "The panel crashed while starting. Send a photo of the lines above (the full log is in $LOG)."
+elif grep -aq '^ready' "$LOG"; then
+  ok "Panel started$(grep -aoE 'xBloom Panel [^ ]+ starting' "$LOG" | head -1 | awk '{print " (version "$3")"}')"
+else
+  warn "Couldn't confirm the start from here. If the screen stays blank, send $LOG."
+fi
 
 printf '\n%s🎉 Done! The panel is restarting with the latest xBloom Panel by Double Shot.%s\n' "$grn$bold" "$rst"
 printf '%s   To update later, run the same command again.%s\n' "$dim" "$rst"
