@@ -59,7 +59,7 @@ A touchscreen that sits next to your **xBloom Studio** and runs it over Bluetoot
 
 ### 3️⃣ One command: downloads the latest firmware and flashes it
 
-Plug in the panel and paste one line. It downloads the ready-made firmware and Espressif's flashing tool, finds the panel and flashes it. **About 5–10 minutes, nothing to install, your Wi-Fi and sign-in are kept.** To update later, paste the same line again.
+Plug in the panel and paste one line. It downloads the ready-made firmware and Espressif's flashing tool, finds the panel and flashes it. **A few minutes (flashing itself takes about one), nothing to install, your Wi-Fi and sign-in are kept.** It picks the fastest speed your cable handles, and if the panel is already up to date it says so and stops. To update later, paste the same line again.
 
 **🍎 Mac** (Terminal):
 
@@ -83,7 +83,7 @@ Set before the command: Mac `XBP_BACKUP=1 bash …` · Windows `$env:XBP_BACKUP=
 | `XBP_BACKUP=1` | Back up the panel to `Desktop/xBloom-backups` first |
 | `XBP_FRESH=1` | Erase everything too (Wi-Fi and xBloom sign-in reset) |
 | `XBP_PORT=…` | Use this port (`/dev/cu.wchusbserial110`, `COM5`) |
-| `XBP_BAUD=460800` | Faster flashing (default `115200`, the speed that always works) |
+| `XBP_BAUD=115200` | Use one flashing speed (normally it tries 921600, then 460800, then 115200) |
 | `XBP_BUILD=1` | Build the firmware from source instead of downloading it (30–60 minutes, installs Python and the build tools) |
 
 </details>
@@ -142,7 +142,7 @@ Every week: Sunday checks the [original project](https://github.com/Mesh-one/Xbl
 
 - **التحديث بالواي فاي:** نزّل [ملف التحديث](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin)، ثم من اللوحة **الإعدادات ← تحديث البرنامج** وارفعه. إعداداتك تبقى.
 - **التثبيت بالكيبل بدون برامج:** نزّل [ملف الكيبل](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin)، افتح https://espressif.github.io/esptool-js/ في كروم، السرعة `115200` ثم **Connect**، العنوان `0x0`، ثم **Program**. ⛔ لا ترفعه من صفحة الواي فاي.
-- **أو بأمر واحد:** انسخ أمر الماك أو الويندوز من الطريقة 3 فوق. ينزّل آخر إصدار ويثبّته خلال ٥–١٠ دقائق بدون بناء، وإعداداتك تبقى. نفس الأمر للتحديث لاحقاً.
+- **أو بأمر واحد:** انسخ أمر الماك أو الويندوز من الطريقة 3 فوق. ينزّل آخر إصدار ويثبّته خلال دقائق بدون بناء، وإعداداتك تبقى. نفس الأمر للتحديث لاحقاً.
 </details>
 
 <div align="center">

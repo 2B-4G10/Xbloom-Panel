@@ -2,13 +2,13 @@
 #
 # Downloads the latest released firmware and Espressif's esptool (a single program,
 # no Python needed), finds the panel and flashes it. Your Wi-Fi and xBloom sign-in
-# are kept. About 5-10 minutes. Nothing is compiled on this PC.
+# are kept. A few minutes (about 1 to flash). Nothing is compiled on this PC.
 #
 # Run in PowerShell (README, Method 3). To update later, run the same command again.
 #
 # Options (set before running, e.g.  $env:XBP_BACKUP = "1"):
 #   XBP_PORT=COM5          use this port instead of finding the panel
-#   XBP_BAUD=460800        faster flashing (default 115200, the speed that always works)
+#   XBP_BAUD=115200        use one flashing speed (default: fastest that works, 921600 -> 460800 -> 115200)
 #   XBP_BACKUP=1           back up the panel first (Desktop\xBloom-backups, about 5-25 minutes)
 #   XBP_FRESH=1            erase everything too (Wi-Fi and xBloom sign-in reset)
 #   XBP_DOWNLOAD_ONLY=1    only download and check the firmware and esptool
@@ -26,7 +26,8 @@ $RepoUrl    = "https://github.com/$Repo"
 $Latest     = "$RepoUrl/releases/latest/download"
 $FullName   = 'xbloom-panel-doubleshot-FULL-USB-ONLY.bin'
 $Home2      = Join-Path $env:LOCALAPPDATA 'xBloom-Panel'      # tools and downloads live here
-$Baud       = if ($env:XBP_BAUD) { $env:XBP_BAUD } else { '115200' }   # the speed that always works on this panel
+$Speeds     = if ($env:XBP_BAUD) { @($env:XBP_BAUD) } else { @('921600','460800','115200') }   # fastest first
+$Baud       = $Speeds[-1]   # reading (backup) uses the speed that always works
 $Desktop    = [Environment]::GetFolderPath('Desktop')
 $BackupDir  = Join-Path $Desktop 'xBloom-backups'
 
@@ -135,22 +136,44 @@ if ($env:XBP_BACKUP) {
 }
 
 # ---------------------------------------------------------------------------
-Step 'Flashing the panel (about 3-5 minutes)'
+# Already up to date? (compares the start of the installed firmware: a few seconds)
+$fullBytes = [IO.File]::ReadAllBytes($Full)
+if (-not $env:XBP_FRESH) {
+  $cur = Join-Path $Home2 'installed-head.bin'
+  & $Esptool --chip esp32s3 -p $Port -b 115200 read-flash 0xE000 0x2100 $cur *> $null
+  if ($LASTEXITCODE -eq 0 -and (Test-Path $cur)) {
+    $want = New-Object byte[] 0x2100; [Array]::Copy($fullBytes, 0xE000, $want, 0, 0x2100)
+    $wantFile = Join-Path $Home2 'release-head.bin'; [IO.File]::WriteAllBytes($wantFile, $want)
+    if ((Get-FileHash $cur).Hash -eq (Get-FileHash $wantFile).Hash) {
+      Write-Host "`nThe panel already runs $tag. Nothing to do." -ForegroundColor Green
+      return
+    }
+  }
+}
+
+Step 'Flashing the panel (about 1 minute)'
 if ($env:XBP_FRESH) {
   Warn 'Fresh install: Wi-Fi and the xBloom sign-in will be reset.'
-  & $Esptool --chip esp32s3 -p $Port -b $Baud write-flash 0x0 $Full
+  $parts = @('0x0', $Full)
 } else {
   # The image minus the settings area (0x9000-0xE000), so Wi-Fi and sign-in stay.
-  $bytes = [IO.File]::ReadAllBytes($Full)
-  $head = New-Object byte[] 0x9000;  [Array]::Copy($bytes, 0, $head, 0, 0x9000)
-  $tailLen = $bytes.Length - 0xE000
-  $tail = New-Object byte[] $tailLen; [Array]::Copy($bytes, 0xE000, $tail, 0, $tailLen)
+  $head = New-Object byte[] 0x9000;  [Array]::Copy($fullBytes, 0, $head, 0, 0x9000)
+  $tailLen = $fullBytes.Length - 0xE000
+  $tail = New-Object byte[] $tailLen; [Array]::Copy($fullBytes, 0xE000, $tail, 0, $tailLen)
   $HeadBin = Join-Path $Home2 'part-boot.bin';  [IO.File]::WriteAllBytes($HeadBin, $head)
   $TailBin = Join-Path $Home2 'part-app.bin';   [IO.File]::WriteAllBytes($TailBin, $tail)
-  & $Esptool --chip esp32s3 -p $Port -b $Baud write-flash 0x0 $HeadBin 0xE000 $TailBin
+  $parts = @('0x0', $HeadBin, '0xE000', $TailBin)
 }
-if ($LASTEXITCODE -ne 0) {
-  Die 'Flash failed. Run the same command again; if it keeps failing, use a shorter data cable plugged straight into the PC.'
+$flashed = $false
+foreach ($speed in $Speeds) {
+  Write-Host "    writing at $speed baud..." -ForegroundColor DarkGray
+  & $Esptool --chip esp32s3 -p $Port -b $speed write-flash @parts
+  if ($LASTEXITCODE -eq 0) { $flashed = $true; break }
+  Warn "That speed didn't work with this cable. Trying slower..."
+  Start-Sleep 2
+}
+if (-not $flashed) {
+  Die 'Flash failed at every speed. Use a shorter data cable plugged straight into the PC, then run again.'
 }
 
 Write-Host "`nDone! The panel is restarting with the latest xBloom Panel by Double Shot." -ForegroundColor Green
