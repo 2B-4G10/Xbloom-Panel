@@ -239,9 +239,10 @@ void tls_free(void *p) { heap_caps_free(p); }
 
 }  // namespace
 
-#ifdef XB_EMULATOR
-SET_LOOP_TASK_STACK_SIZE(16 * 1024);  // QEMU's slower timing lets more LVGL work pile into one call
-#endif
+// The UI runs on Arduino's loop task. Its default 8 KB stack is too small for
+// LVGL's first full-screen draw (about 9 KB measured), which overflowed it at
+// start-up. 24 KB leaves ample room; [mem] in the start-up log shows what is left.
+SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 
 extern "C" bool verifyRollbackLater() { return true; }  // Arduino: we confirm updates ourselves
 
