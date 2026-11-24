@@ -1,142 +1,94 @@
 # xBloom Panel - Double Shot edition - one-command installer for Windows 10/11.
 #
-# Checks and installs everything it needs (winget, Git, Python 3.10-3.14,
-# PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the panel, backs up
-# its current firmware if asked (XBP_BACKUP=1), builds this repo and flashes it.
+# Downloads the latest released firmware and Espressif's esptool (a single program,
+# no Python needed), finds the panel and flashes it. Your Wi-Fi and xBloom sign-in
+# are kept. About 5-10 minutes. Nothing is compiled on this PC.
 #
-# Run in PowerShell (README, Method 3), or again later from the downloaded project:
-#   powershell -ExecutionPolicy Bypass -File "$HOME\Xbloom-Panel\scripts\flash-windows.ps1"
+# Run in PowerShell (README, Method 3). To update later, run the same command again.
 #
 # Options (set before running, e.g.  $env:XBP_BACKUP = "1"):
-#   XBP_PORT=COM5          use this port instead of auto-detecting
-#   XBP_BAUD=115200        serial speed (115200 is the reliable default)
-#   XBP_BACKUP=1           also back up the panel first (about 25 minutes; off by default)
-#   XBP_BUILD_ONLY=1       build the update file but don't flash
-#   XBP_DIR=...            where the source is kept (default: %USERPROFILE%\Xbloom-Panel)
+#   XBP_PORT=COM5          use this port instead of finding the panel
+#   XBP_BAUD=460800        faster flashing (default 115200, the speed that always works)
+#   XBP_BACKUP=1           back up the panel first (Desktop\xBloom-backups, about 5-25 minutes)
+#   XBP_FRESH=1            erase everything too (Wi-Fi and xBloom sign-in reset)
+#   XBP_DOWNLOAD_ONLY=1    only download and check the firmware and esptool
+#   XBP_BUILD=1            build the firmware from source instead of downloading it (30-60 minutes,
+#                          needs Git and Python; see README)
 
 # Native tools write harmless warnings to stderr, which 'Stop' would treat as fatal in
-# Windows PowerShell 5.1, so failures are checked explicitly with `$LASTEXITCODE / -ErrorAction Stop.
+# Windows PowerShell 5.1, so failures are checked explicitly with $LASTEXITCODE.
 $ErrorActionPreference = 'Continue'
-$ProgressPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'   # makes downloads much faster in Windows PowerShell 5.1
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$RepoUrl     = 'https://github.com/2B-4G10/Xbloom-Panel'
-$Dir         = if ($env:XBP_DIR) { $env:XBP_DIR } else { Join-Path $HOME 'Xbloom-Panel' }
-$Baud        = if ($env:XBP_BAUD) { $env:XBP_BAUD } else { '115200' }
-$PioPkg      = 'pioarduino==6.1.19'   # the PlatformIO Core the ESP32 platform itself uses (see requirements-build.txt)
-$EnvName     = 'crowpanel-advance-43'
-$PioHome     = Join-Path $HOME '.platformio'
-$Penv        = Join-Path $PioHome 'penv'
-$EsptoolVenv = Join-Path $HOME '.esptool'
-$Desktop     = [Environment]::GetFolderPath('Desktop')
-$BackupDir   = Join-Path $Desktop 'xBloom-backups'
+$Repo       = '2B-4G10/Xbloom-Panel'
+$RepoUrl    = "https://github.com/$Repo"
+$Latest     = "$RepoUrl/releases/latest/download"
+$FullName   = 'xbloom-panel-doubleshot-FULL-USB-ONLY.bin'
+$Home2      = Join-Path $env:LOCALAPPDATA 'xBloom-Panel'      # tools and downloads live here
+$Baud       = if ($env:XBP_BAUD) { $env:XBP_BAUD } else { '115200' }   # the speed that always works on this panel
+$Desktop    = [Environment]::GetFolderPath('Desktop')
+$BackupDir  = Join-Path $Desktop 'xBloom-backups'
 
 function Step($m) { Write-Host "`n==> $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "    [ok] $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "    [!]  $m" -ForegroundColor Yellow }
 function Die($m)  { throw $m }
 function YesDefault($q) { $a = Read-Host "   $q [Y/n]"; return (-not $a) -or ($a -match '^[Yy]') }
-function Run($exe, [string[]]$argv) {   # run a program and stop on failure
-  & $exe @argv
-  if ($LASTEXITCODE -ne 0) { Die "Command failed ($LASTEXITCODE): $exe $($argv -join ' ')" }
-}
-function Refresh-Path {
-  $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
-}
-function Py-Ok($py) {   # true if $py is Python 3.10-3.14
-  if (-not $py -or -not (Test-Path $py)) { return $false }
-  & $py -c 'import sys; sys.exit(0 if (3,10) <= sys.version_info[:2] <= (3,14) else 1)' 2>$null
-  return ($LASTEXITCODE -eq 0)
-}
-function Winget-Install($id) {
-  Run 'winget' @('install', '-e', '--id', $id, '--accept-source-agreements', '--accept-package-agreements', '--silent')
-  Refresh-Path
+function Download($url, $out) {
+  for ($try = 1; $try -le 3; $try++) {
+    try { Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $out -ErrorAction Stop; return }
+    catch { if ($try -eq 3) { Die "Couldn't download $url ($($_.Exception.Message)). Check the internet connection and run again." }; Start-Sleep 3 }
+  }
 }
 
 try {
+New-Item -ItemType Directory -Force $Home2 -ErrorAction Stop | Out-Null
+
 # ---------------------------------------------------------------------------
 Step 'Checking this PC'
 if ($env:OS -ne 'Windows_NT') { Die 'This script is for Windows. On a Mac use scripts/flash-mac.sh.' }
 Ok ("Windows {0}" -f [Environment]::OSVersion.Version)
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-  Die "winget is missing. Install 'App Installer' from the Microsoft Store, then run this again."
-}
-Ok 'winget'
 
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Warn 'Installing Git...'; Winget-Install 'Git.Git' }
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Die 'Git install did not finish. Close PowerShell, open a new one and run again.' }
-Ok (git --version)
-
-# ---------------------------------------------------------------------------
-Step 'Python 3.10-3.14 (the ESP32 tools do not support newer versions yet)'
-$Py = $null
-foreach ($v in '3.13','3.12','3.14','3.11','3.10') {
-  $cand = $null
-  if (Get-Command py -ErrorAction SilentlyContinue) {
-    $cand = (& py "-$v" -c 'import sys; print(sys.executable)' 2>$null)
-  }
-  if (-not $cand) {
-    $guess = Join-Path $env:LOCALAPPDATA ("Programs\Python\Python{0}\python.exe" -f $v.Replace('.',''))
-    if (Test-Path $guess) { $cand = $guess }
-  }
-  if ($cand -and (Py-Ok $cand)) { $Py = $cand; break }
+if ($env:XBP_BUILD) {
+  # Building from source is the slow, advanced path: hand over to the build script.
+  $Build = Join-Path $Home2 'build-windows.ps1'
+  Download "https://raw.githubusercontent.com/$Repo/main/scripts/build-windows.ps1" $Build
+  & powershell -ExecutionPolicy Bypass -File $Build
+  return
 }
-if (-not $Py) {
-  Warn 'No suitable Python found. Installing Python 3.13...'
-  Winget-Install 'Python.Python.3.13'
-  $Py = @((Join-Path $env:LOCALAPPDATA 'Programs\Python\Python313\python.exe'), (Join-Path $env:ProgramFiles 'Python313\python.exe')) | Where-Object { Test-Path $_ } | Select-Object -First 1
-  if (-not (Py-Ok $Py)) { Die 'Python 3.13 install did not finish. Close PowerShell, open a new one and run again.' }
-}
-Ok ("Using {0} at {1}" -f (& $Py --version), $Py)
 
 # ---------------------------------------------------------------------------
-Step "PlatformIO ($PioPkg)"
-# The ESP32 platform runs part of the build with the PlatformIO Core in .platformio\penv,
-# so the whole build uses that same core (mixing two cores breaks the last build step).
-$PenvPy  = Join-Path $Penv 'Scripts\python.exe'
-$Pio     = Join-Path $Penv 'Scripts\pio.exe'
-if ((Test-Path $PenvPy) -and -not (Py-Ok $PenvPy)) {
-  Warn 'PlatformIO uses an unsupported Python. Rebuilding its environment...'
-  Remove-Item -Recurse -Force $Penv -ErrorAction Stop   # only PlatformIO's own Python environment; recreated below
+Step 'esptool (Espressif''s flashing program)'
+$EsptoolDir = Join-Path $Home2 'esptool'
+$Esptool = Get-ChildItem $EsptoolDir -Recurse -Filter 'esptool.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+if (-not $Esptool) {
+  $rel = Invoke-RestMethod -UseBasicParsing 'https://api.github.com/repos/espressif/esptool/releases/latest' -ErrorAction SilentlyContinue
+  $url = $rel.assets | Where-Object { $_.name -like '*windows-amd64.zip' } | Select-Object -First 1 -ExpandProperty browser_download_url
+  if (-not $url) { $url = 'https://github.com/espressif/esptool/releases/download/v5.7.0/esptool-v5.7.0-windows-amd64.zip' }
+  Warn 'Downloading esptool (about 60 MB, once)...'
+  $zip = Join-Path $Home2 'esptool.zip'
+  Download $url $zip
+  if (Test-Path $EsptoolDir) { Remove-Item -Recurse -Force $EsptoolDir }
+  Expand-Archive -Force $zip $EsptoolDir -ErrorAction Stop
+  Remove-Item $zip -ErrorAction SilentlyContinue
+  $Esptool = Get-ChildItem $EsptoolDir -Recurse -Filter 'esptool.exe' | Select-Object -First 1 -ExpandProperty FullName
 }
-if (-not (Test-Path $PenvPy)) { Run $Py @('-m','venv',$Penv) }
-$want = ($PioPkg -split '==')[1]
-$have = ((& $PenvPy -m pip show pioarduino 2>$null) | Select-String '^Version:\s*(.+)$' | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() })
-if ($have -ne $want) {
-  Run $PenvPy @('-m','pip','install','-q','--upgrade','pip')
-  & $PenvPy -m pip uninstall -y -q platformio 2>$null | Out-Null   # stock core, if an older install left it
-  Run $PenvPy @('-m','pip','install','-q','--force-reinstall',$PioPkg)
-}
-Ok (& $Pio --version)
-
-Step 'esptool (for the backup and the flash)'
-$EsptoolPy = Join-Path $EsptoolVenv 'Scripts\python.exe'
-if (-not (Py-Ok $EsptoolPy)) {
-  if (Test-Path $EsptoolVenv) { Remove-Item -Recurse -Force $EsptoolVenv -ErrorAction Stop }
-  Run $Py @('-m','venv',$EsptoolVenv)
-}
-Run $EsptoolPy @('-m','pip','install','-q','--upgrade','esptool')
-$Esptool = Join-Path $EsptoolVenv 'Scripts\esptool.exe'
+if (-not $Esptool) { Die 'esptool could not be set up. Your antivirus may have removed it: allow it and run again.' }
 Ok ("esptool " + ((& $Esptool version 2>$null) | Select-Object -Last 1))
 
 # ---------------------------------------------------------------------------
-Step 'Getting the source'
-if (Test-Path (Join-Path $Dir '.git')) {
-  if (git -C $Dir status --porcelain --untracked-files=no) {
-    Run 'git' @('-C',$Dir,'stash','push','-q','-m',"xbp installer auto-stash $(Get-Date -Format yyyy-MM-dd-HHmm)")
-    Warn "You had local edits in $Dir - saved them with 'git stash'."
-  }
-  # Always the exact published code, even if this copy's history no longer matches
-  # (local edits were stashed just above).
-  Run 'git' @('-C',$Dir,'remote','set-url','origin',$RepoUrl)
-  Run 'git' @('-C',$Dir,'fetch','-q','origin','main')
-  Run 'git' @('-C',$Dir,'checkout','-q','-B','main','origin/main')
-  Run 'git' @('-C',$Dir,'reset','-q','--hard','origin/main')
-} else {
-  Run 'git' @('clone','-q',$RepoUrl,$Dir)
-}
-Ok ("$Dir at " + (git -C $Dir log -1 --format='%h %s'))
-$FwVersion = ([regex]::Match((Get-Content (Join-Path $Dir 'platformio.ini') -Raw), "FW_VERSION='\""([^""]*)\""'")).Groups[1].Value
-if (-not $FwVersion) { $FwVersion = 'dev' }
+Step 'Downloading the latest firmware'
+$Full = Join-Path $Home2 $FullName
+$Sums = Join-Path $Home2 'SHA256SUMS.txt'
+Download "$Latest/$FullName" $Full
+Download "$Latest/SHA256SUMS.txt" $Sums
+$want = (Get-Content $Sums | Where-Object { $_ -match [regex]::Escape($FullName) } | ForEach-Object { ($_ -split '\s+')[0] }) | Select-Object -First 1
+$have = (Get-FileHash $Full -Algorithm SHA256).Hash.ToLower()
+if (-not $want -or $have -ne $want.ToLower()) { Die 'The download is damaged (checksum does not match). Run again.' }
+$tag = try { (Invoke-RestMethod -UseBasicParsing "https://api.github.com/repos/$Repo/releases/latest").tag_name } catch { 'latest' }
+Ok ("{0} ({1:N1} MB, checksum verified)" -f $tag, ((Get-Item $Full).Length / 1MB))
+if ($env:XBP_DOWNLOAD_ONLY) { Write-Host "`nDownloaded and checked: $Full" -ForegroundColor Green; return }
 
 # ---------------------------------------------------------------------------
 function Find-Panel {
@@ -144,7 +96,7 @@ function Find-Panel {
   Get-CimInstance Win32_PnPEntity | Where-Object { $_.PNPDeviceID -match 'VID_1A86' }
 }
 $Port = $env:XBP_PORT
-if (-not $env:XBP_BUILD_ONLY -and -not $Port) {
+if (-not $Port) {
   Step 'Finding the panel (USB-C, data cable)'
   for ($attempt = 1; $attempt -le 10; $attempt++) {
     $devs = @(Find-Panel)
@@ -167,58 +119,44 @@ if (-not $env:XBP_BUILD_ONLY -and -not $Port) {
   Ok "Panel port: $Port"
 }
 
-if (-not $env:XBP_BUILD_ONLY) {
-  Step 'Talking to the panel'
-  $chip = & $Esptool --chip esp32s3 -p $Port -b $Baud chip-id 2>&1 | Out-String
-  if ($LASTEXITCODE -ne 0) { Write-Host $chip; Die "Couldn't talk to the panel. Hold BOOT, tap RESET, release BOOT, then run again." }
-  $Mac = ([regex]::Match($chip, '([0-9a-f]{2}:){5}[0-9a-f]{2}')).Value -replace ':',''
-  Ok "ESP32-S3 found $(if ($Mac) { "(MAC $Mac)" })"
+Step 'Talking to the panel'
+$chip = & $Esptool --chip esp32s3 -p $Port -b 115200 chip-id 2>&1 | Out-String
+if ($LASTEXITCODE -ne 0) { Write-Host $chip; Die "Couldn't talk to the panel. Close other programs using it (Arduino, serial monitors), or hold BOOT, tap RESET, release BOOT, then run again." }
+$Mac = ([regex]::Match($chip, '([0-9a-f]{2}:){5}[0-9a-f]{2}')).Value -replace ':',''
+Ok "ESP32-S3 found $(if ($Mac) { "(MAC $Mac)" })"
 
-  if ($env:XBP_BACKUP -and -not $env:XBP_NO_BACKUP) {
-    Step "Backing up the panel's current firmware (about 25 minutes at $Baud baud)"
-    New-Item -ItemType Directory -Force $BackupDir -ErrorAction Stop | Out-Null
-    $existing = Get-ChildItem $BackupDir -Filter "*$Mac*.bin" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($existing -and -not (YesDefault "A backup already exists ($($existing.Name)). Make a new one anyway?")) {
-      Ok "Keeping $($existing.FullName)"
-    } else {
-      $bk = Join-Path $BackupDir ("xbloom-panel-{0}-{1}.bin" -f $(if ($Mac) { $Mac } else { 'unknown' }), (Get-Date -Format 'yyyyMMdd-HHmm'))
-      & $Esptool --chip esp32s3 -p $Port -b $Baud read-flash 0 ALL $bk
-      if ($LASTEXITCODE -ne 0) { Die 'Backup failed, so nothing was written to the panel. Try a shorter cable or $env:XBP_BAUD="57600".' }
-      $sz = (Get-Item $bk).Length
-      if ($sz -lt 4194304) { Die "Backup is only $sz bytes - not flashing." }
-      Ok ("Saved {0} ({1} MB). Keep a copy somewhere safe." -f $bk, [math]::Round($sz/1MB))
-    }
-  }
+if ($env:XBP_BACKUP) {
+  Step "Backing up the panel's current firmware"
+  New-Item -ItemType Directory -Force $BackupDir -ErrorAction Stop | Out-Null
+  $bk = Join-Path $BackupDir ("xbloom-panel-{0}-{1}.bin" -f $(if ($Mac) { $Mac } else { 'unknown' }), (Get-Date -Format 'yyyyMMdd-HHmm'))
+  & $Esptool --chip esp32s3 -p $Port -b $Baud read-flash 0 ALL $bk
+  if ($LASTEXITCODE -ne 0) { Die 'Backup failed, so nothing was written to the panel. Try a shorter data cable.' }
+  Ok ("Saved {0} ({1} MB). Keep a copy somewhere safe." -f $bk, [math]::Round((Get-Item $bk).Length/1MB))
 }
 
 # ---------------------------------------------------------------------------
-Step 'Building the firmware (first build: 10-30 minutes)'
-Push-Location $Dir
-try { & $Pio run -e $EnvName; if ($LASTEXITCODE -ne 0) { Die "Build failed. Copy the last 30 lines and open an issue on $RepoUrl/issues." } }
-finally { Pop-Location }
-$B = Join-Path $Dir ".pio\build\$EnvName"
-$BootApp0 = Join-Path $PioHome 'packages\framework-arduinoespressif32\tools\partitions\boot_app0.bin'
-foreach ($f in "$B\bootloader.bin","$B\partitions.bin","$B\firmware.bin",$BootApp0) {
-  if (-not (Test-Path $f)) { Die "Expected build output is missing: $f" }
+Step 'Flashing the panel (about 3-5 minutes)'
+if ($env:XBP_FRESH) {
+  Warn 'Fresh install: Wi-Fi and the xBloom sign-in will be reset.'
+  & $Esptool --chip esp32s3 -p $Port -b $Baud write-flash 0x0 $Full
+} else {
+  # The image minus the settings area (0x9000-0xE000), so Wi-Fi and sign-in stay.
+  $bytes = [IO.File]::ReadAllBytes($Full)
+  $head = New-Object byte[] 0x9000;  [Array]::Copy($bytes, 0, $head, 0, 0x9000)
+  $tailLen = $bytes.Length - 0xE000
+  $tail = New-Object byte[] $tailLen; [Array]::Copy($bytes, 0xE000, $tail, 0, $tailLen)
+  $HeadBin = Join-Path $Home2 'part-boot.bin';  [IO.File]::WriteAllBytes($HeadBin, $head)
+  $TailBin = Join-Path $Home2 'part-app.bin';   [IO.File]::WriteAllBytes($TailBin, $tail)
+  & $Esptool --chip esp32s3 -p $Port -b $Baud write-flash 0x0 $HeadBin 0xE000 $TailBin
 }
-$UpdateBin = Join-Path $Desktop "xbloom-panel-$FwVersion-doubleshot-UPDATE-WiFi-or-USB.bin"
-Copy-Item "$B\firmware.bin" $UpdateBin -Force -ErrorAction Stop
-Ok "Wi-Fi update file: $UpdateBin"
-
-if ($env:XBP_BUILD_ONLY) {
-  Write-Host "`nBuilt! Upload $(Split-Path $UpdateBin -Leaf) from the panel: Settings > Software update." -ForegroundColor Green
-  return
+if ($LASTEXITCODE -ne 0) {
+  Die 'Flash failed. Run the same command again; if it keeps failing, use a shorter data cable plugged straight into the PC.'
 }
 
-# ---------------------------------------------------------------------------
-Step 'Flashing the panel (a few minutes)'
-# Same four pieces 'pio run -t upload' writes. Wi-Fi and xBloom login (NVS) are left alone.
-& $Esptool --chip esp32s3 -p $Port -b $Baud write-flash 0x0 "$B\bootloader.bin" 0x8000 "$B\partitions.bin" 0xe000 $BootApp0 0x10000 "$B\firmware.bin"
-if ($LASTEXITCODE -ne 0) { Die 'Flash failed. The panel may be half-written: just run this again (see Help in the README).' }
-
-Write-Host "`nDone! The panel is restarting with the Double Shot boot logo." -ForegroundColor Green
-Write-Host "    Update file: $UpdateBin$(if ($env:XBP_BACKUP) { "  |  Backup: $BackupDir" })" -ForegroundColor DarkGray
+Write-Host "`nDone! The panel is restarting with the latest xBloom Panel by Double Shot." -ForegroundColor Green
+Write-Host "    To update later, run the same command again." -ForegroundColor DarkGray
 }
 catch {
   Write-Host "`n[x] Stopped: $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host "    Run the same command again, or see Help in the README: $RepoUrl#-help" -ForegroundColor DarkGray
 }

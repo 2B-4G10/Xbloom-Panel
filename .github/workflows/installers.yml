@@ -1,6 +1,7 @@
 # Runs the README's one-command installers, exactly as written there, on fresh
-# Windows and Mac machines: download, every tool they install, and the
-# firmware build. (No panel is plugged in, so they stop after the build: XBP_BUILD_ONLY.)
+# Windows and Mac machines, twice: the normal way (download the firmware and esptool,
+# check them; no panel is plugged in, so XBP_DOWNLOAD_ONLY stops there) and the
+# build-from-source way (XBP_BUILD=1, stopping after the build with XBP_BUILD_ONLY).
 name: Installer test
 
 on:
@@ -37,6 +38,11 @@ jobs:
           $cmd = [regex]::Match($readme, '(?s)```powershell\r?\n(.*?)\r?\n```').Groups[1].Value
           if (-not $cmd) { throw 'No PowerShell command found in README.md' }
           Write-Host $cmd
+          $env:XBP_DOWNLOAD_ONLY = '1'
+          $out = Invoke-Expression $cmd *>&1 | Out-String; Write-Host $out
+          if ($out -notmatch 'Downloaded and checked') { throw 'The download path did not finish' }
+          Remove-Item Env:XBP_DOWNLOAD_ONLY
+          $env:XBP_BUILD = '1'
           Invoke-Expression $cmd
           if (-not (Get-ChildItem ([Environment]::GetFolderPath('Desktop')) -Filter 'xbloom-panel-*-UPDATE-WiFi-or-USB.bin' -ErrorAction SilentlyContinue)) {
             throw 'The installer did not produce the update file'
@@ -60,5 +66,7 @@ jobs:
           cmd=$(awk '/^```bash$/{f=1;next} /^```$/{if(f)exit} f' readme/README.md | head -1)
           [ -n "$cmd" ] || { echo "No Mac command in README.md"; exit 1; }
           echo "$cmd"
-          bash -c "$cmd"
+          XBP_DOWNLOAD_ONLY=1 bash -c "$cmd" | tee /tmp/dl.txt
+          grep -q 'Downloaded and checked' /tmp/dl.txt
+          XBP_BUILD=1 bash -c "$cmd"
           ls ~/Desktop/xbloom-panel-*-UPDATE-WiFi-or-USB.bin
