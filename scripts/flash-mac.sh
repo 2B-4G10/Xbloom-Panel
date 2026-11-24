@@ -1,135 +1,84 @@
 #!/usr/bin/env bash
 # xBloom Panel · Double Shot edition — one-command installer for macOS.
 #
-# Checks and installs everything it needs (Xcode command-line tools, Homebrew,
-# Python 3.10–3.14, PlatformIO (pioarduino core), esptool, the WCH USB driver), finds the
-# panel, backs up its current firmware if asked (XBP_BACKUP=1), builds this repo and flashes it.
+# Downloads the latest released firmware and Espressif's esptool (a single program,
+# no Python needed), finds the panel and flashes it. Your Wi-Fi and xBloom sign-in
+# are kept. About 5–10 minutes. Nothing is compiled on this Mac.
 #
-# Run (README, Method 3), or again later:  bash ~/Xbloom-Panel/scripts/flash-mac.sh
+# Run (README, Method 3). To update later, run the same command again.
 #
-# Options (environment variables):
-#   XBP_PORT=/dev/cu.xxx   use this serial port instead of auto-detecting
-#   XBP_BAUD=115200        serial speed (115200 is the reliable default)
-#   XBP_BACKUP=1           also back up the panel first (about 25 minutes; off by default)
-#   XBP_BUILD_ONLY=1       build the update file but don't flash
-#   XBP_DIR=~/Xbloom-Panel where the source is kept
+# Options (environment variables, e.g.  XBP_BACKUP=1 bash …):
+#   XBP_PORT=/dev/cu.xxx   use this serial port instead of finding the panel
+#   XBP_BAUD=460800        faster flashing (default 115200, the speed that always works)
+#   XBP_BACKUP=1           back up the panel first (~/Desktop/xBloom-backups)
+#   XBP_FRESH=1            erase everything too (Wi-Fi and xBloom sign-in reset)
+#   XBP_DOWNLOAD_ONLY=1    only download and check the firmware and esptool
+#   XBP_BUILD=1            build the firmware from source instead (30–60 minutes; see README)
 set -euo pipefail
 
-REPO_URL="https://github.com/2B-4G10/Xbloom-Panel"
-DIR="${XBP_DIR:-$HOME/Xbloom-Panel}"
+REPO="2B-4G10/Xbloom-Panel"
+REPO_URL="https://github.com/$REPO"
+LATEST="$REPO_URL/releases/latest/download"
+FULL_NAME="xbloom-panel-doubleshot-FULL-USB-ONLY.bin"
+WORK="$HOME/Library/Application Support/xBloom-Panel"   # tools and downloads live here
 BAUD="${XBP_BAUD:-115200}"
-PIO_PKG="pioarduino==6.1.19"   # the PlatformIO Core the ESP32 platform itself uses (see requirements-build.txt)
-ENV_NAME="crowpanel-advance-43"
-PIO_HOME="$HOME/.platformio"
-PENV="$PIO_HOME/penv"
-ESPTOOL_VENV="$HOME/.esptool"
 BACKUP_DIR="$HOME/Desktop/xBloom-backups"
 
 bold=$'\033[1m'; dim=$'\033[2m'; red=$'\033[31m'; grn=$'\033[32m'; yel=$'\033[33m'; rst=$'\033[0m'
 step() { printf '\n%s☕ %s%s\n' "$bold" "$*" "$rst"; }
 ok()   { printf '   %s✓%s %s\n' "$grn" "$rst" "$*"; }
 warn() { printf '   %s!%s %s\n' "$yel" "$rst" "$*"; }
-die()  { printf '\n%s✗ %s%s\n' "$red" "$*" "$rst" >&2; exit 1; }
+die()  { printf '\n%s✗ %s%s\n   %sRun the same command again, or see Help in the README: %s%s\n' "$red" "$*" "$rst" "$dim" "$REPO_URL#-help" "$rst" >&2; exit 1; }
 # Prompts read from the terminal, so they work even when the script is piped in.
 ask()  { local a; read -r -p "   $1 " a </dev/tty || true; printf '%s' "$a"; }
-yes_default() { local a; a="$(ask "$1 [Y/n]")"; [[ -z "$a" || "$a" =~ ^[Yy] ]]; }
-
-py_ok() {  # $1 = python executable; succeeds if it is 3.10–3.14
-  "$1" -c 'import sys; sys.exit(0 if (3,10) <= sys.version_info[:2] <= (3,14) else 1)' 2>/dev/null
+fetch() {  # url → file, with retries
+  curl -fL --retry 3 --retry-delay 3 -sS -o "$2" "$1" || die "Couldn't download $1. Check the internet connection."
 }
+
+mkdir -p "$WORK"
 
 # ---------------------------------------------------------------------------
 step "Checking this Mac"
 [[ "$(uname -s)" == "Darwin" ]] || die "This script is for macOS. On Windows use scripts/flash-windows.ps1."
 ok "macOS $(sw_vers -productVersion) on $(uname -m)"
 
-if ! xcode-select -p >/dev/null 2>&1; then
-  warn "Apple's command-line tools (git, compilers) are missing. Opening the installer…"
-  xcode-select --install || true
-  die "Finish the 'command line developer tools' install, then run this script again."
+if [[ -n "${XBP_BUILD:-}" ]]; then
+  # Building from source is the slow, advanced path: hand over to the build script.
+  fetch "https://raw.githubusercontent.com/$REPO/main/scripts/build-mac.sh" "$WORK/build-mac.sh"
+  exec bash "$WORK/build-mac.sh"
 fi
-ok "Command-line tools"
-command -v git >/dev/null || die "git not found even though the command-line tools are installed."
-ok "git $(git --version | awk '{print $3}')"
-
-# Homebrew (standard locations plus a home-folder install)
-BREW=""
-for b in "$(command -v brew 2>/dev/null || true)" /opt/homebrew/bin/brew /usr/local/bin/brew "$HOME/.homebrew/bin/brew" "$HOME/homebrew/bin/brew"; do
-  [[ -n "$b" && -x "$b" ]] && { BREW="$b"; break; }
-done
-if [[ -z "$BREW" ]]; then
-  warn "Homebrew isn't installed. It's needed for Python 3.13 and the USB driver."
-  if yes_default "Install Homebrew now (official installer from brew.sh)?"; then
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
-    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do [[ -x "$b" ]] && BREW="$b"; done
-  fi
-  [[ -n "$BREW" ]] || die "Homebrew is required. Install it from https://brew.sh and run this script again."
-fi
-eval "$("$BREW" shellenv)"
-ok "Homebrew ($BREW)"
 
 # ---------------------------------------------------------------------------
-step "Python 3.10–3.14 (the ESP32 tools don't support newer versions yet)"
-PY=""
-for v in 3.13 3.12 3.14 3.11 3.10; do
-  for c in "$("$BREW" --prefix 2>/dev/null)/opt/python@$v/bin/python$v" "$(command -v "python$v" 2>/dev/null || true)"; do
-    [[ -n "$c" && -x "$c" ]] && py_ok "$c" && { PY="$c"; break 2; }
-  done
-done
-if [[ -z "$PY" ]]; then
-  warn "No suitable Python found (your default python3 is $(python3 --version 2>&1 | awk '{print $2}')). Installing Python 3.13 with Homebrew…"
-  "$BREW" install python@3.13
-  PY="$("$BREW" --prefix python@3.13)/bin/python3.13"
-  py_ok "$PY" || die "Python 3.13 install didn't work."
+step "esptool (Espressif's flashing program)"
+ESPTOOL="$(find "$WORK/esptool" -type f -name esptool -perm -u+x 2>/dev/null | head -1 || true)"
+if [[ -z "$ESPTOOL" ]]; then
+  arch="$( [[ "$(uname -m)" == "arm64" ]] && echo arm64 || echo amd64 )"
+  url="$(curl -fsSL https://api.github.com/repos/espressif/esptool/releases/latest 2>/dev/null \
+         | grep -Eo "https://[^\"]*macos-$arch\.tar\.gz" | head -1 || true)"
+  url="${url:-https://github.com/espressif/esptool/releases/download/v5.7.0/esptool-v5.7.0-macos-$arch.tar.gz}"
+  warn "Downloading esptool (about 60 MB, once)…"
+  fetch "$url" "$WORK/esptool.tar.gz"
+  rm -rf "$WORK/esptool"; mkdir -p "$WORK/esptool"
+  tar -xzf "$WORK/esptool.tar.gz" -C "$WORK/esptool" || die "esptool download is damaged."
+  rm -f "$WORK/esptool.tar.gz"
+  xattr -dr com.apple.quarantine "$WORK/esptool" 2>/dev/null || true
+  ESPTOOL="$(find "$WORK/esptool" -type f -name esptool | head -1)"
+  chmod +x "$ESPTOOL"
 fi
-ok "Using $("$PY" --version) at $PY"
-
-# ---------------------------------------------------------------------------
-step "PlatformIO (${PIO_PKG})"
-# The ESP32 platform runs part of the build with the PlatformIO Core in ~/.platformio/penv,
-# so the whole build uses that same core (mixing two cores breaks the last build step).
-if [[ -x "$PENV/bin/python" ]] && ! py_ok "$PENV/bin/python"; then
-  warn "PlatformIO's environment uses $("$PENV/bin/python" --version 2>&1). Rebuilding it with $("$PY" --version)…"
-  rm -rf "$PENV"   # only PlatformIO's own Python environment; recreated just below
-fi
-[[ -x "$PENV/bin/python" ]] || "$PY" -m venv "$PENV"
-want="${PIO_PKG#*==}"
-have="$("$PENV/bin/python" -m pip show pioarduino 2>/dev/null | awk '/^Version:/{print $2}' || true)"
-if [[ "$have" != "$want" ]]; then
-  "$PENV/bin/python" -m pip install -q --upgrade pip
-  "$PENV/bin/python" -m pip uninstall -y -q platformio 2>/dev/null || true   # stock core, if an older install left it
-  "$PENV/bin/python" -m pip install -q --force-reinstall "$PIO_PKG"
-fi
-PIO="$PENV/bin/pio"
-ok "$("$PIO" --version)"
-
-step "esptool (for the backup and the flash)"
-if [[ ! -x "$ESPTOOL_VENV/bin/esptool" ]] || ! py_ok "$ESPTOOL_VENV/bin/python"; then
-  rm -rf "$ESPTOOL_VENV"
-  "$PY" -m venv "$ESPTOOL_VENV"
-fi
-"$ESPTOOL_VENV/bin/python" -m pip install -q --upgrade esptool
-ESPTOOL="$ESPTOOL_VENV/bin/esptool"
+"$ESPTOOL" version >/dev/null 2>&1 || die "esptool won't start. Allow it in System Settings → Privacy & Security, then run again."
 ok "esptool $("$ESPTOOL" version 2>/dev/null | tail -1)"
 
 # ---------------------------------------------------------------------------
-step "Getting the source"
-if [[ -d "$DIR/.git" ]]; then
-  if [[ -n "$(git -C "$DIR" status --porcelain --untracked-files=no)" ]]; then
-    git -C "$DIR" stash push -q -m "xbp installer auto-stash $(date +%F-%H%M)"
-    warn "You had local edits in $DIR — saved them with 'git stash' (git stash list to see them)."
-  fi
-  # Always the exact published code, even if this copy's history no longer matches
-  # (local edits were stashed just above).
-  git -C "$DIR" remote set-url origin "$REPO_URL"
-  git -C "$DIR" fetch -q origin main || die "Couldn't download the latest code. Check the internet connection and run again."
-  git -C "$DIR" checkout -q -B main origin/main
-  git -C "$DIR" reset -q --hard origin/main
-else
-  git clone -q "$REPO_URL" "$DIR"
-fi
-ok "$DIR at $(git -C "$DIR" log -1 --format='%h %s')"
-FW_VERSION="$(sed -n "s/.*FW_VERSION='\"\([^\"]*\)\"'.*/\1/p" "$DIR/platformio.ini")"
+step "Downloading the latest firmware"
+FULL="$WORK/$FULL_NAME"
+fetch "$LATEST/$FULL_NAME" "$FULL"
+fetch "$LATEST/SHA256SUMS.txt" "$WORK/SHA256SUMS.txt"
+want="$(grep "$FULL_NAME" "$WORK/SHA256SUMS.txt" | awk '{print $1}' | head -1)"
+have="$(shasum -a 256 "$FULL" | awk '{print $1}')"
+[[ -n "$want" && "$have" == "$want" ]] || die "The download is damaged (checksum doesn't match)."
+tag="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep -Eo '"tag_name": *"[^"]+"' | cut -d'"' -f4 || true)"
+ok "${tag:-latest} ($(( $(stat -f%z "$FULL") / 1048576 )) MB, checksum verified)"
+if [[ -n "${XBP_DOWNLOAD_ONLY:-}" ]]; then printf '\n%sDownloaded and checked: %s%s\n' "$grn" "$FULL" "$rst"; exit 0; fi
 
 # ---------------------------------------------------------------------------
 find_ports() { ls /dev/cu.wchusbserial* /dev/cu.usbserial* /dev/cu.usbmodem* /dev/cu.SLAB_USBtoUART* 2>/dev/null || true; }
@@ -137,19 +86,17 @@ wch_on_usb() { ioreg -p IOUSB -l -w0 2>/dev/null | grep -q '"idVendor" = 6790'; 
 wch_driver_state() { systemextensionsctl list 2>/dev/null | grep -i 'cn.wch.CH34xVCPDriver' | grep -o '\[[^]]*\]' | tail -1 || true; }
 
 PORT="${XBP_PORT:-}"
-if [[ -z "${XBP_BUILD_ONLY:-}" && -z "$PORT" ]]; then
+if [[ -z "$PORT" ]]; then
   step "Finding the panel (USB-C, data cable)"
   for attempt in 1 2 3 4 5 6 7 8 9 10; do
     PORTS=(); while IFS= read -r p; do [[ -z "$p" ]] || PORTS+=("$p"); done < <(find_ports)
     [[ ${#PORTS[@]} -gt 0 ]] && break
-
     if wch_on_usb; then
       state="$(wch_driver_state)"
       if [[ -z "$state" ]]; then
-        warn "The panel's USB chip (WCH CH34x) is connected but has no driver. Installing it…"
-        "$BREW" install --cask wch-ch34x-usb-serial-driver || true
-        open -a CH34xVCPDriver 2>/dev/null || true
-        warn "In the CH34xVCPDriver window that opened, click Install."
+        warn "The panel's USB chip (WCH CH34x) is connected but has no driver."
+        warn "Opening WCH's driver page: download, open the installer, then click Install."
+        open "https://www.wch-ic.com/downloads/CH34XSER_MAC_ZIP.html" 2>/dev/null || true
       elif [[ "$state" != "[activated enabled]" ]]; then
         warn "WCH driver is installed but not switched on ($state)."
         warn "System Settings → General → Login Items & Extensions → Driver Extensions → turn on CH34xVCPDriver."
@@ -160,7 +107,7 @@ if [[ -z "${XBP_BUILD_ONLY:-}" && -z "$PORT" ]]; then
       warn "No panel found on USB. Check: the panel's screen is on, the cable carries data (not charge-only),"
       warn "and it's plugged straight into the Mac (no hub)."
     fi
-    [[ $attempt -eq 10 ]] && die "Still no panel port. See Help in the README."
+    [[ $attempt -eq 10 ]] && die "Still no panel port."
     ask "Press Enter to look again…" >/dev/null
   done
   if [[ ${#PORTS[@]} -eq 1 ]]; then
@@ -170,53 +117,36 @@ if [[ -z "${XBP_BUILD_ONLY:-}" && -z "$PORT" ]]; then
     n="$(ask "Which one is the panel? [1]")"; PORT="${PORTS[$(( ${n:-1} - 1 ))]}"
   fi
   ok "Panel port: $PORT"
+fi
 
-  step "Talking to the panel"
-  "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" chip-id >/tmp/xbp-chip.txt 2>&1 \
-    || { cat /tmp/xbp-chip.txt; die "Couldn't talk to the panel. Hold BOOT, tap RESET, release BOOT, then run again."; }
-  MAC="$(grep -Eo '([0-9a-f]{2}:){5}[0-9a-f]{2}' /tmp/xbp-chip.txt | head -1 | tr -d ':' || true)"
-  ok "ESP32-S3 found${MAC:+ (MAC $MAC)}"
+step "Talking to the panel"
+"$ESPTOOL" --chip esp32s3 -p "$PORT" -b 115200 chip-id >"$WORK/chip.txt" 2>&1 \
+  || { cat "$WORK/chip.txt"; die "Couldn't talk to the panel. Close other programs using it, or hold BOOT, tap RESET, release BOOT."; }
+MAC="$(grep -Eo '([0-9a-f]{2}:){5}[0-9a-f]{2}' "$WORK/chip.txt" | head -1 | tr -d ':' || true)"
+ok "ESP32-S3 found${MAC:+ (MAC $MAC)}"
 
-  # ---------------------------------------------------------------------------
-  if [[ -n "${XBP_BACKUP:-}" && -z "${XBP_NO_BACKUP:-}" ]]; then
-    step "Backing up the panel's current firmware (about 25 minutes at $BAUD baud)"
-    mkdir -p "$BACKUP_DIR"
-    EXISTING="$(ls -t "$BACKUP_DIR"/*"${MAC:-}"*.bin "$HOME"/Desktop/xbloom-backup-*.bin 2>/dev/null | head -1 || true)"
-    if [[ -n "$EXISTING" ]] && ! yes_default "A backup already exists ($(basename "$EXISTING")). Make a new one anyway?"; then
-      ok "Keeping $EXISTING"
-    else
-      BK="$BACKUP_DIR/xbloom-panel-${MAC:-unknown}-$(date +%Y%m%d-%H%M).bin"
-      "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" read-flash 0 ALL "$BK" \
-        || die "Backup failed, so nothing was written to the panel. Try a shorter cable or XBP_BAUD=57600."
-      sz=$(stat -f%z "$BK"); [[ $sz -ge 4194304 ]] || die "Backup is only $sz bytes — not flashing."
-      ok "Saved $BK ($((sz/1048576)) MB). Keep a copy somewhere safe."
-    fi
-  fi
+if [[ -n "${XBP_BACKUP:-}" ]]; then
+  step "Backing up the panel's current firmware"
+  mkdir -p "$BACKUP_DIR"
+  BK="$BACKUP_DIR/xbloom-panel-${MAC:-unknown}-$(date +%Y%m%d-%H%M).bin"
+  "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" read-flash 0 ALL "$BK" \
+    || die "Backup failed, so nothing was written to the panel. Try a shorter data cable."
+  ok "Saved $BK. Keep a copy somewhere safe."
 fi
 
 # ---------------------------------------------------------------------------
-step "Building the firmware (first build: 10–30 minutes)"
-( cd "$DIR" && "$PIO" run -e "$ENV_NAME" ) || die "Build failed. Copy the last 30 lines and open an issue on $REPO_URL/issues."
-B="$DIR/.pio/build/$ENV_NAME"
-BOOT_APP0="$PIO_HOME/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"
-for f in "$B/bootloader.bin" "$B/partitions.bin" "$B/firmware.bin" "$BOOT_APP0"; do
-  [[ -s "$f" ]] || die "Expected build output is missing: $f"
-done
-UPDATE_BIN="$HOME/Desktop/xbloom-panel-${FW_VERSION:-dev}-doubleshot-UPDATE-WiFi-or-USB.bin"
-cp "$B/firmware.bin" "$UPDATE_BIN"
-ok "Wi-Fi update file: $UPDATE_BIN"
-
-if [[ -n "${XBP_BUILD_ONLY:-}" ]]; then
-  printf '\n%s✨ Built. Upload %s from the panel: Settings → Software update.%s\n' "$grn" "$(basename "$UPDATE_BIN")" "$rst"
-  exit 0
+step "Flashing the panel (about 3–5 minutes)"
+if [[ -n "${XBP_FRESH:-}" ]]; then
+  warn "Fresh install: Wi-Fi and the xBloom sign-in will be reset."
+  "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" write-flash 0x0 "$FULL" \
+    || die "Flash failed. Use a shorter data cable plugged straight into the Mac."
+else
+  # The image minus the settings area (0x9000–0xE000), so Wi-Fi and sign-in stay.
+  dd if="$FULL" of="$WORK/part-boot.bin" bs=4096 count=9 2>/dev/null
+  dd if="$FULL" of="$WORK/part-app.bin" bs=4096 skip=14 2>/dev/null
+  "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" write-flash 0x0 "$WORK/part-boot.bin" 0xe000 "$WORK/part-app.bin" \
+    || die "Flash failed. Use a shorter data cable plugged straight into the Mac."
 fi
 
-# ---------------------------------------------------------------------------
-step "Flashing the panel (a few minutes)"
-# Same four pieces 'pio run -t upload' writes. Wi-Fi and xBloom login (NVS) are left alone.
-"$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" write-flash \
-  0x0 "$B/bootloader.bin" 0x8000 "$B/partitions.bin" 0xe000 "$BOOT_APP0" 0x10000 "$B/firmware.bin" \
-  || die "Flash failed. The panel may be half-written: just run this script again (see Help in the README)."
-
-printf '\n%s🎉 Done! The panel is restarting with the Double Shot boot logo.%s\n' "$grn$bold" "$rst"
-printf '%s   Update file: %s%s%s\n' "$dim" "$UPDATE_BIN" "${XBP_BACKUP:+   ·   Backup: $BACKUP_DIR}" "$rst"
+printf '\n%s🎉 Done! The panel is restarting with the latest xBloom Panel by Double Shot.%s\n' "$grn$bold" "$rst"
+printf '%s   To update later, run the same command again.%s\n' "$dim" "$rst"

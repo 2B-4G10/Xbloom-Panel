@@ -57,9 +57,9 @@ A touchscreen that sits next to your **xBloom Studio** and runs it over Bluetoot
 
 > ⛔ The USB file only works over USB. Never upload it on the Wi-Fi update page.
 
-### 3️⃣ One command: builds the latest code and flashes it
+### 3️⃣ One command: downloads the latest firmware and flashes it
 
-Plug in the panel and paste one line. It installs everything it needs. The first run takes 30–60 minutes ☕. **To update later, paste the same line again.**
+Plug in the panel and paste one line. It downloads the ready-made firmware and Espressif's flashing tool, finds the panel and flashes it. **About 5–10 minutes, nothing to install, your Wi-Fi and sign-in are kept.** To update later, paste the same line again.
 
 **🍎 Mac** (Terminal):
 
@@ -80,10 +80,11 @@ Set before the command: Mac `XBP_BACKUP=1 bash …` · Windows `$env:XBP_BACKUP=
 
 | Option | Effect |
 |---|---|
-| `XBP_BACKUP=1` | Back up the panel to `Desktop/xBloom-backups` first (about 25 minutes) |
-| `XBP_BUILD_ONLY=1` | Only build the Wi-Fi update file |
+| `XBP_BACKUP=1` | Back up the panel to `Desktop/xBloom-backups` first |
+| `XBP_FRESH=1` | Erase everything too (Wi-Fi and xBloom sign-in reset) |
 | `XBP_PORT=…` | Use this port (`/dev/cu.wchusbserial110`, `COM5`) |
-| `XBP_BAUD=…` | Serial speed (default `115200`, try `57600` with a long cable) |
+| `XBP_BAUD=460800` | Faster flashing (default `115200`, the speed that always works) |
+| `XBP_BUILD=1` | Build the firmware from source instead of downloading it (30–60 minutes, installs Python and the build tools) |
 
 </details>
 
@@ -119,7 +120,7 @@ Hold **BOOT**, tap **RESET**, release **BOOT**, and try again. With a long cable
 <details>
 <summary><b>The one-command install stopped</b></summary>
 
-Paste the same command again: it picks up where it left off. The build is the slow part (30–60 minutes the first time); while new lines keep appearing, it's working. On Windows, don't click inside the PowerShell window: that pauses it until you press <kbd>Enter</kbd>.
+Paste the same command again. It checks every download and starts clean each time. If it can't talk to the panel, close other programs using it (Arduino IDE, serial monitors), or hold **BOOT**, tap **RESET**, release **BOOT**, and try again.
 </details>
 
 <details>
@@ -141,7 +142,7 @@ Every week: Sunday checks the [original project](https://github.com/Mesh-one/Xbl
 
 - **التحديث بالواي فاي:** نزّل [ملف التحديث](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin)، ثم من اللوحة **الإعدادات ← تحديث البرنامج** وارفعه. إعداداتك تبقى.
 - **التثبيت بالكيبل بدون برامج:** نزّل [ملف الكيبل](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin)، افتح https://espressif.github.io/esptool-js/ في كروم، السرعة `115200` ثم **Connect**، العنوان `0x0`، ثم **Program**. ⛔ لا ترفعه من صفحة الواي فاي.
-- **أو بأمر واحد:** انسخ أمر الماك أو الويندوز من الطريقة 3 فوق، ونفس الأمر للتحديث لاحقاً.
+- **أو بأمر واحد:** انسخ أمر الماك أو الويندوز من الطريقة 3 فوق. ينزّل آخر إصدار ويثبّته خلال ٥–١٠ دقائق بدون بناء، وإعداداتك تبقى. نفس الأمر للتحديث لاحقاً.
 </details>
 
 <div align="center">
