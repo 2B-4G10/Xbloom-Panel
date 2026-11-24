@@ -2,6 +2,28 @@
 
 All the good stuff, newest first. ☕ Every version is on the [releases page](https://github.com/2B-4G10/Xbloom-Panel/releases).
 
+## ☕ [4.1.1 · build 19](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.1-ds.19) · 2026-11-24
+
+> [!IMPORTANT]
+> **Fix release.** 4.0 and 4.1 could stop at start-up on a real panel, leaving a lit but blank screen. **4.1.1 fixes it.** Please update.
+
+### 🐞 Fixed
+- 🖥️ **Blank screen at start-up:** the panel's main program ran out of working memory (its stack) while drawing the first screen and restarted over and over. It now has three times the room, measured to leave plenty spare.
+
+### 🛠️ Improved
+#### 💻 One-command install: minutes, not an hour
+- ⚡ **No building:** the command now downloads the ready-made firmware and Espressif's flashing tool. Nothing is compiled and nothing else is installed, so antivirus blocks and long builds are gone.
+- 🚀 **Fastest safe speed:** it tries 921600, then 460800, then 115200 baud, whichever your cable handles. Flashing takes about a minute.
+- ✅ **Checks its work:** every download is checksum-verified. After flashing it watches the panel start up and tells you if anything goes wrong, instead of just saying "Done".
+- ⏭️ **Already up to date?** It notices in seconds and stops.
+- 🔐 **Settings kept:** Wi-Fi and your xBloom sign-in stay. Use `XBP_FRESH=1` to start from scratch.
+- 🧰 Building from source is still there for those who want it: `XBP_BUILD=1`.
+
+### 🔄 Updating
+- **Panel showing a blank screen?** Plug it in by USB and paste the README's one-line command. It installs 4.1.1 in a few minutes.
+- **Otherwise:** use **Settings → Software update** as usual.
+
+
 ## ☕ [4.1.0 · build 18](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.0-ds.18) · 2026-11-23
 
 > [!TIP]
