@@ -3,13 +3,13 @@
 #
 # Downloads the latest released firmware and Espressif's esptool (a single program,
 # no Python needed), finds the panel and flashes it. Your Wi-Fi and xBloom sign-in
-# are kept. About 5–10 minutes. Nothing is compiled on this Mac.
+# are kept. A few minutes (about 1 to flash). Nothing is compiled on this Mac.
 #
 # Run (README, Method 3). To update later, run the same command again.
 #
 # Options (environment variables, e.g.  XBP_BACKUP=1 bash …):
 #   XBP_PORT=/dev/cu.xxx   use this serial port instead of finding the panel
-#   XBP_BAUD=460800        faster flashing (default 115200, the speed that always works)
+#   XBP_BAUD=115200        use one flashing speed (default: fastest that works, 921600 → 460800 → 115200)
 #   XBP_BACKUP=1           back up the panel first (~/Desktop/xBloom-backups)
 #   XBP_FRESH=1            erase everything too (Wi-Fi and xBloom sign-in reset)
 #   XBP_DOWNLOAD_ONLY=1    only download and check the firmware and esptool
@@ -21,7 +21,8 @@ REPO_URL="https://github.com/$REPO"
 LATEST="$REPO_URL/releases/latest/download"
 FULL_NAME="xbloom-panel-doubleshot-FULL-USB-ONLY.bin"
 WORK="$HOME/Library/Application Support/xBloom-Panel"   # tools and downloads live here
-BAUD="${XBP_BAUD:-115200}"
+SPEEDS="${XBP_BAUD:-921600 460800 115200}"   # fastest first
+BAUD="${SPEEDS##* }"                         # reading (backup) uses the speed that always works
 BACKUP_DIR="$HOME/Desktop/xBloom-backups"
 
 bold=$'\033[1m'; dim=$'\033[2m'; red=$'\033[31m'; grn=$'\033[32m'; yel=$'\033[33m'; rst=$'\033[0m'
@@ -135,18 +136,34 @@ if [[ -n "${XBP_BACKUP:-}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-step "Flashing the panel (about 3–5 minutes)"
+# Already up to date? (compares the start of the installed firmware: a few seconds)
+if [[ -z "${XBP_FRESH:-}" ]]; then
+  rm -f "$WORK/installed-head.bin"
+  if "$ESPTOOL" --chip esp32s3 -p "$PORT" -b 115200 read-flash 0xe000 0x2100 "$WORK/installed-head.bin" >/dev/null 2>&1 \
+     && dd if="$FULL" bs=4096 skip=14 2>/dev/null | head -c $((0x2100)) | cmp -s - "$WORK/installed-head.bin"; then
+    printf '\n%s✓ The panel already runs %s. Nothing to do.%s\n' "$grn$bold" "${tag:-the latest version}" "$rst"
+    exit 0
+  fi
+fi
+
+step "Flashing the panel (about 1 minute)"
 if [[ -n "${XBP_FRESH:-}" ]]; then
   warn "Fresh install: Wi-Fi and the xBloom sign-in will be reset."
-  "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" write-flash 0x0 "$FULL" \
-    || die "Flash failed. Use a shorter data cable plugged straight into the Mac."
+  PARTS=(0x0 "$FULL")
 else
   # The image minus the settings area (0x9000–0xE000), so Wi-Fi and sign-in stay.
   dd if="$FULL" of="$WORK/part-boot.bin" bs=4096 count=9 2>/dev/null
   dd if="$FULL" of="$WORK/part-app.bin" bs=4096 skip=14 2>/dev/null
-  "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$BAUD" write-flash 0x0 "$WORK/part-boot.bin" 0xe000 "$WORK/part-app.bin" \
-    || die "Flash failed. Use a shorter data cable plugged straight into the Mac."
+  PARTS=(0x0 "$WORK/part-boot.bin" 0xe000 "$WORK/part-app.bin")
 fi
+flashed=""
+for speed in $SPEEDS; do
+  printf '%s   writing at %s baud…%s\n' "$dim" "$speed" "$rst"
+  if "$ESPTOOL" --chip esp32s3 -p "$PORT" -b "$speed" write-flash "${PARTS[@]}"; then flashed=1; break; fi
+  warn "That speed didn't work with this cable. Trying slower…"
+  sleep 2
+done
+[[ -n "$flashed" ]] || die "Flash failed at every speed. Use a shorter data cable plugged straight into the Mac."
 
 printf '\n%s🎉 Done! The panel is restarting with the latest xBloom Panel by Double Shot.%s\n' "$grn$bold" "$rst"
 printf '%s   To update later, run the same command again.%s\n' "$dim" "$rst"
