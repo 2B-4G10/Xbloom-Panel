@@ -50,6 +50,12 @@ void check_online();                  // ask for a check now
 Online online_state();
 const char *online_version();         // e.g. "4.2.0" once a check found a release
 void install_online();                // download and install the release found
+int online_build();                   // the N of the release found (v4.2.0-ds.N)
+// What to do when one is found: 0 ask (pop-up), 1 install automatically, 2 don't remind.
+int update_mode();
+void set_update_mode(int m);
+void snooze_update_day();             // "Remind me tomorrow"
+bool update_snoozed();
 
 // Saved panel settings
 bool pref_clock();                    // show a clock instead of a black screen

@@ -50,8 +50,10 @@ volatile bool web_up = false, mdns_up = false, ntp_up = false;
 // ---- saved settings -------------------------------------------------------------
 struct {
   bool clock = true, night_off = false;
-  int sleep_min = 3, clock_color = 0, lang = 0;
+  int sleep_min = 3, clock_color = 0, lang = 0, upd_mode = 0;
+  uint32_t snooze_until = 0;      // epoch seconds ("Remind me tomorrow")
 } prefs;
+uint32_t snooze_until_ms = 0;     // the same, when the clock isn't set yet
 
 // ---- update upload --------------------------------------------------------------
 volatile bool page_open = false;  // only while Settings > Software update is on screen
@@ -573,6 +575,8 @@ void begin() {
   prefs.sleep_min = settings.getInt("sleep", 3);
   prefs.clock_color = settings.getInt("ccolor", 0);
   prefs.lang = settings.getInt("lang", 0);
+  prefs.upd_mode = settings.getInt("updmode", 0);
+  prefs.snooze_until = settings.getUInt("snooze", 0);
   strlcpy(g_ssid, settings.getString("ssid", "").c_str(), sizeof g_ssid);
   strlcpy(g_password, settings.getString("pass", "").c_str(), sizeof g_password);
   snprintf(g_host, sizeof g_host, "%s.local", HOST);
@@ -636,6 +640,21 @@ int update_progress() { return g_upd_pct; }
 const char *update_error() { return g_upd_error; }
 
 void check_online() { want_check = true; }
+int online_build() { return g_online_build; }
+int update_mode() { return prefs.upd_mode; }
+void set_update_mode(int m) { prefs.upd_mode = m; settings.putInt("updmode", m); }
+void snooze_update_day() {
+  if (time_valid()) {
+    prefs.snooze_until = (uint32_t)time(nullptr) + 24 * 3600;
+    settings.putUInt("snooze", prefs.snooze_until);
+  } else {
+    snooze_until_ms = millis() + 24UL * 3600 * 1000;
+  }
+}
+bool update_snoozed() {
+  if (snooze_until_ms && (int32_t)(snooze_until_ms - millis()) > 0) return true;
+  return time_valid() && (uint32_t)time(nullptr) < prefs.snooze_until;
+}
 Online online_state() { return g_online; }
 const char *online_version() { return g_online_ver; }
 void install_online() {
