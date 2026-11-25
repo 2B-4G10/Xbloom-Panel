@@ -316,6 +316,9 @@ const Step PHASE_EN[] = {
     {Op::Tap, "Software update", 1500},
     {Op::Expect, "Install", 60000},  // found the latest release on GitHub (real network)
     {Op::Shot, "en_23_update", 0},
+    {Op::Tap, "Install", 1000},      // downloads it and checks its SHA-256 (not installed here)
+    {Op::Expect, "Installed. Restarting...", 300000},
+    {Op::Shot, "en_23b_update_verified", 0},
     {Op::TapAny, BACK_SYMBOLS, 1200},
     {Op::Tap, "Double Shot", 1500},
     {Op::Shot, "en_24_store", 0},

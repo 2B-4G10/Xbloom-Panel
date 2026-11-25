@@ -240,6 +240,14 @@ void install_latest() {
     Update.abort();
     return fail_update("The download was damaged. Try again");
   }
+#ifdef XB_EMULATOR
+  // The test downloads and verifies the real release but keeps the emulator build.
+  Update.abort();
+  g_upd_pct = 100;
+  g_upd = net::Upd::Done;
+  Serial.printf("[update] downloaded and verified %s (%lld bytes); emulator: not installed\n", tag, (long long)length);
+  return;
+#endif
   if (!Update.end(true)) return fail_update(Update.errorString());
   g_upd_pct = 100;
   g_upd = net::Upd::Done;
