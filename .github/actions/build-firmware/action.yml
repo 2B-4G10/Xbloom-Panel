@@ -47,6 +47,13 @@ runs:
         PIO_ENV: ${{ inputs.environment }}
       run: ~/.platformio/penv/bin/pio run -e "$PIO_ENV"
 
+    # The ESP32-S3 crashes (LoadStoreError) on 8/16-bit reads from its code area.
+    - name: Check for narrow reads from the code area
+      shell: bash
+      env:
+        PIO_ENV: ${{ inputs.environment }}
+      run: python3 tools/check_code_loads.py ".pio/build/$PIO_ENV/firmware.elf" "$(ls ~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump)"
+
     - name: Collect the firmware files
       id: collect
       shell: bash
