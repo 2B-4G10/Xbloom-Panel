@@ -13,6 +13,14 @@ Berry Bomb, for fruity natural coffees, under Recipes → Starter.
 
 ### ✨ New
 - 🛜 **One-tap updates.** The panel checks GitHub for a new version after it joins Wi-Fi, and twice a day after that. **Settings** shows **Update ready** in green when one is out. Tap **Install**, and the panel downloads it, verifies it against the release's checksum and restarts into it. Your recipes and settings stay.
+- 🔔 **A friendly pop-up when a new version is out.** Choose:
+  - **Ok** to install it now.
+  - **Cancel** to be asked again next time the panel starts.
+  - **Remind me Tomorrow** to wait a day.
+  - **Never Show This Again!** to see it only in Settings.
+  - **Always Update Automatically** to let the panel update itself after two quiet minutes, never mid-brew.
+
+  Change your mind anytime in **Software update → When an update is out**.
 - 📱 Installing a file from your phone still works, as a backup, from the same screen.
 
 ### 🐞 Fixed
