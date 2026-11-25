@@ -33,6 +33,10 @@ void update_page(bool) {}
 Upd update_state() { return upd; }
 int update_progress() { return 45; }
 const char *update_error() { return ""; }
+void check_online() {}
+Online online_state() { return Online::Available; }
+const char *online_version() { return "4.2.0"; }
+void install_online() {}
 bool pref_clock() { return true; }
 void set_pref_clock(bool) {}
 bool pref_night_off() { return false; }

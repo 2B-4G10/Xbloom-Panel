@@ -202,4 +202,4 @@ else
 fi
 
 printf '\n%s🎉 Done! The panel is restarting with the latest xBloom Panel by Double Shot.%s\n' "$grn$bold" "$rst"
-printf '%s   To update later, run the same command again.%s\n' "$dim" "$rst"
+printf '%s   Next time, update from the panel itself: Settings > Software update > Install.%s\n' "$dim" "$rst"

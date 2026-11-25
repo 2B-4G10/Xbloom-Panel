@@ -8,12 +8,16 @@
 #include <Update.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <esp_crt_bundle.h>
+#include <esp_http_client.h>
 #include <esp_wifi.h>
+#include <mbedtls/sha256.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <string.h>
 
 #include <algorithm>
+#include <string>
 
 namespace {
 
@@ -65,6 +69,197 @@ void set_upd_error(const char *e) {
 void fail_update(const char *why) {
   set_upd_error(why);
   g_upd = net::Upd::Failed;
+}
+
+// ---- updates from GitHub ------------------------------------------------------------
+constexpr const char *RELEASES = "https://github.com/2B-4G10/Xbloom-Panel/releases";
+constexpr uint32_t RECHECK_MS = 12UL * 3600 * 1000;
+volatile net::Online g_online = net::Online::Unknown;
+volatile bool want_check = false, want_install = false;
+uint32_t last_check = 0;
+char g_online_ver[24] = "", g_online_tag[40] = "";
+int g_online_build = 0;
+
+// The newest release is wherever /releases/latest redirects to (…/tag/v4.2.0-ds.25):
+// no API call, so no rate limit.
+esp_err_t grab_location(esp_http_client_event_t *e) {
+  if (e->event_id == HTTP_EVENT_ON_HEADER && !strcasecmp(e->header_key, "Location"))
+    strlcpy((char *)e->user_data, e->header_value, 200);
+  return ESP_OK;
+}
+
+esp_http_client_handle_t open_url(const char *url, int &status, int64_t &length, http_event_handle_cb on_event = nullptr,
+                                  void *user = nullptr, bool follow = true) {
+  esp_http_client_config_t cfg = {};
+  cfg.url = url;
+  cfg.timeout_ms = 20000;
+  cfg.crt_bundle_attach = esp_crt_bundle_attach;
+  cfg.buffer_size = 4096;
+  cfg.buffer_size_tx = 1536;  // GitHub's download links are long
+  cfg.max_redirection_count = 5;
+  cfg.disable_auto_redirect = true;
+  cfg.event_handler = on_event;
+  cfg.user_data = user;
+  esp_http_client_handle_t http = esp_http_client_init(&cfg);
+  if (!http) return nullptr;
+  esp_http_client_set_header(http, "User-Agent", "xbloom-panel/" FW_VERSION);
+  for (int hop = 0; hop < 6; ++hop) {
+    if (esp_http_client_open(http, 0) != ESP_OK) break;
+    length = esp_http_client_fetch_headers(http);
+    status = esp_http_client_get_status_code(http);
+    const bool redirect = status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
+    if (!redirect || !follow) return http;
+    esp_http_client_flush_response(http, nullptr);
+    esp_http_client_set_redirection(http);
+    esp_http_client_close(http);
+  }
+  esp_http_client_cleanup(http);
+  return nullptr;
+}
+
+void finish(esp_http_client_handle_t http) {
+  esp_http_client_close(http);
+  esp_http_client_cleanup(http);
+}
+
+void check_latest() {
+  g_online = net::Online::Checking;
+  last_check = millis();
+  char location[200] = "";
+  int status = 0;
+  int64_t length = 0;
+  const std::string url = std::string(RELEASES) + "/latest";
+  esp_http_client_handle_t http = open_url(url.c_str(), status, length, grab_location, location, false);
+  if (http) finish(http);
+  // …/tag/v4.2.0-ds.25
+  const char *tag = strstr(location, "/tag/");
+  int build = 0;
+  const char *ds = tag ? strstr(tag, "-ds.") : nullptr;
+  if (!tag || !ds || (build = atoi(ds + 4)) <= 0) {
+    Serial.printf("[update] check failed (status %d)\n", status);
+    g_online = net::Online::Failed;
+    return;
+  }
+  tag += 5;
+  {
+    Locked l;
+    strlcpy(g_online_tag, tag, sizeof g_online_tag);
+    const char *v = tag[0] == 'v' ? tag + 1 : tag;
+    strlcpy(g_online_ver, v, std::min<size_t>(sizeof g_online_ver, ds - v + 1));
+    g_online_build = build;
+  }
+#ifdef XB_EMULATOR
+  const int own = 1;  // the emulator test always finds the real latest release newer
+#else
+  const int own = FW_BUILD;
+#endif
+  const bool newer = build > own;
+  Serial.printf("[update] latest %s, this is build %d: %s\n", tag, own, newer ? "update available" : "up to date");
+  g_online = newer ? net::Online::Available : net::Online::UpToDate;
+}
+
+// Fetches a small text file (the release's SHA256SUMS.txt).
+bool fetch_text(const char *url, std::string &out) {
+  int status = 0;
+  int64_t length = 0;
+  esp_http_client_handle_t http = open_url(url, status, length);
+  if (!http) return false;
+  char chunk[512];
+  out.clear();
+  for (int n; status == 200 && out.size() < 4096 && (n = esp_http_client_read(http, chunk, sizeof chunk)) > 0;)
+    out.append(chunk, n);
+  finish(http);
+  return status == 200 && !out.empty();
+}
+
+void install_latest() {
+  char tag[40];
+  {
+    Locked l;
+    strlcpy(tag, g_online_tag, sizeof tag);
+  }
+  if (!tag[0]) return fail_update("Check for the update first");
+  set_upd_error("");
+  g_upd_pct = 0;
+  g_upd = net::Upd::Receiving;
+  const std::string base = std::string(RELEASES) + "/download/" + tag + "/";
+
+  // The expected SHA-256 of the update file, from the release's SHA256SUMS.txt.
+  std::string sums;
+  if (!fetch_text((base + "SHA256SUMS.txt").c_str(), sums)) return fail_update("Can't reach GitHub. Try again");
+  // Lines read "<64 hex digits>  <file name>".
+  const size_t at = sums.find(UPDATE_FILE);
+  const size_t line = at == std::string::npos ? at : sums.rfind('\n', at);
+  const size_t start = line == std::string::npos ? 0 : line + 1;
+  if (at == std::string::npos || at < start + 64) return fail_update("The release has no checksum for the update");
+  const std::string want = sums.substr(start, 64);
+
+  int status = 0;
+  int64_t length = 0;
+  esp_http_client_handle_t http = open_url((base + UPDATE_FILE).c_str(), status, length);
+  if (!http || status != 200 || length <= 0) {
+    if (http) finish(http);
+    char why[64];
+    snprintf(why, sizeof why, "Download failed (%d). Try again", status);
+    return fail_update(why);
+  }
+  if (!Update.begin((size_t)length, U_FLASH)) {
+    finish(http);
+    return fail_update("Not enough space for the update");
+  }
+  mbedtls_sha256_context sha;
+  mbedtls_sha256_init(&sha);
+  mbedtls_sha256_starts(&sha, 0);
+  static uint8_t buf[4096];
+  int64_t done = 0;
+  bool ok = true;
+  while (done < length) {
+    const int n = esp_http_client_read(http, (char *)buf, sizeof buf);
+    if (n <= 0) {
+      ok = false;
+      fail_update("Connection lost. Try again");
+      break;
+    }
+    mbedtls_sha256_update(&sha, buf, n);
+    if (Update.write(buf, n) != (size_t)n) {
+      ok = false;
+      fail_update(Update.errorString());
+      break;
+    }
+    done += n;
+    g_upd_pct = (int)std::min<int64_t>(99, done * 100 / length);
+  }
+  finish(http);
+  uint8_t digest[32];
+  mbedtls_sha256_finish(&sha, digest);
+  mbedtls_sha256_free(&sha);
+  if (!ok) return Update.abort();
+  char got[65];
+  for (int i = 0; i < 32; ++i) snprintf(got + 2 * i, 3, "%02x", digest[i]);
+  if (want != got) {
+    Update.abort();
+    return fail_update("The download was damaged. Try again");
+  }
+  if (!Update.end(true)) return fail_update(Update.errorString());
+  g_upd_pct = 100;
+  g_upd = net::Upd::Done;
+  Serial.printf("[update] installed %s, restarting\n", tag);
+  vTaskDelay(pdMS_TO_TICKS(2000));  // time for the screen to say "restarting"
+  ESP.restart();
+}
+
+void online_updates() {
+  if (g_wifi != net::Wifi::Connected || g_upd == net::Upd::Receiving) return;
+  if (want_install) {
+    want_install = false;
+    return install_latest();
+  }
+  const uint32_t wait = g_online == net::Online::Failed ? 10UL * 60 * 1000 : RECHECK_MS;  // a failed check: again in 10 min
+  const bool due = g_online == net::Online::Unknown || millis() - last_check > wait;
+  if (want_check || due) {
+    want_check = false;
+    check_latest();
+  }
 }
 
 // ---- the web page -----------------------------------------------------------------
@@ -352,6 +547,7 @@ void task(void *) {
       scan();
     }
     track_connection();
+    online_updates();
     if (web_up) server.handleClient();
     vTaskDelay(pdMS_TO_TICKS(g_upd == net::Upd::Receiving ? 1 : 20));  // keep up with an upload
   }
@@ -379,7 +575,7 @@ void begin() {
 #else
   if (g_ssid[0]) want_join = true;
 #endif
-  xTaskCreatePinnedToCore(task, "net", 8192, nullptr, 2, nullptr, 0);
+  xTaskCreatePinnedToCore(task, "net", 12288, nullptr, 2, nullptr, 0);
 }
 
 Wifi state() { return g_wifi; }
@@ -430,6 +626,13 @@ void update_page(bool enabled) {
 Upd update_state() { return g_upd; }
 int update_progress() { return g_upd_pct; }
 const char *update_error() { return g_upd_error; }
+
+void check_online() { want_check = true; }
+Online online_state() { return g_online; }
+const char *online_version() { return g_online_ver; }
+void install_online() {
+  if (g_online == Online::Available && g_upd != Upd::Receiving) want_install = true;
+}
 
 bool pref_clock() { return prefs.clock; }
 void set_pref_clock(bool on) { prefs.clock = on; settings.putBool("clock", on); }
