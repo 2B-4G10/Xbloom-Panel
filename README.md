@@ -25,7 +25,8 @@ A touchscreen that sits next to your **xBloom Studio** and runs it over Bluetoot
 - ⚙️ **Grinder, Brewer and Scale** controls
 - 🌐 **English or العربية**, with Arabic or English numbers
 - 😋 **Every emoji** in colour
-- 🕰️ **Idle clock** and 🛜 **Wi-Fi updates**
+- 🔄 **Updates itself over Wi-Fi**: one tap, or fully automatic
+- 🕰️ **Idle clock**, and a silent dimmed standby
 - 🛍️ **Double Shot tab** with QR codes for the shop
 
 <div align="center">
@@ -39,30 +40,11 @@ A touchscreen that sits next to your **xBloom Studio** and runs it over Bluetoot
 
 ---
 
-## 🚀 Install (pick one)
+## 🚀 Install
 
-### 1️⃣ Over Wi-Fi: if the panel already runs xBloom Panel
+**Flash it once by cable. After that it updates itself over Wi-Fi.** Your recipes and settings always stay.
 
-**From 4.2.0 on:** when a new version is out, **Settings → Software update** says so. Tap **Install**. The panel downloads it, checks it and restarts. Your settings stay. 🎉
-
-**Older versions,** or with no internet on the panel's Wi-Fi:
-1. Download [**the Wi-Fi update file**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin).
-2. On the panel: **Settings → Software update**. Open the address it shows on your phone.
-3. Choose the file and upload. The panel restarts.
-
-### 2️⃣ Over USB: new panel, no software needed
-
-1. Download [**the USB file**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin) and plug in the panel.
-2. In **Chrome** or **Edge**, open **https://espressif.github.io/esptool-js/**
-3. Baudrate `115200` → **Connect** → pick the panel's port.
-4. Flash Address `0x0` → choose the file → **Program**.
-5. Press the panel's **RESET** button. Set up Wi-Fi and your account again.
-
-> ⛔ The USB file only works over USB. Never upload it on the Wi-Fi update page.
-
-### 3️⃣ One command: downloads the latest firmware and flashes it
-
-Plug in the panel and paste one line. It downloads the ready-made firmware and Espressif's flashing tool, finds the panel and flashes it. **A few minutes (flashing itself takes about one), nothing to install, your Wi-Fi and sign-in are kept.** It picks the fastest speed your cable handles, and if the panel is already up to date it says so and stops. To update later, paste the same line again.
+Plug the panel into your computer and paste one line:
 
 **🍎 Mac** (Terminal):
 
@@ -91,6 +73,17 @@ Set before the command: Mac `XBP_BACKUP=1 bash …` · Windows `$env:XBP_BACKUP=
 
 </details>
 
+<details>
+<summary>🌐 No terminal? Flash from the browser</summary>
+
+1. Download [**the USB file**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin) and plug in the panel.
+2. In **Chrome** or **Edge**, open **https://espressif.github.io/esptool-js/**
+3. Baudrate `115200` → **Connect** → pick the panel's port.
+4. Flash Address `0x0` → choose the file → **Program**, then press **RESET**.
+
+⛔ This file is for USB only.
+</details>
+
 ---
 
 ## ⚙️ After installing
@@ -99,6 +92,14 @@ Set before the command: Mac `XBP_BACKUP=1 bash …` · Windows `$env:XBP_BACKUP=
 2. **Settings → xBloom account:** sign in with your xBloom app email and password.
 3. Turn on the xBloom Studio. The panel connects by itself.
 4. **Settings → Language:** English or العربية.
+
+---
+
+## 🔄 Updates
+
+When a new version is out, the panel asks. Tap **Ok** to install, or pick **Always Update Automatically** and forget about it. Each download is verified, and if an update ever fails to start, the panel goes back to the last version by itself.
+
+Change this anytime in **Settings → Software update**.
 
 ---
 
@@ -129,7 +130,7 @@ Paste the same command again. It checks every download and starts clean each tim
 <details>
 <summary><b>↩️ Restore a backup</b></summary>
 
-Use **Method 2** with your backup file (from `Desktop/xBloom-backups`) at address `0x0`.
+Use **Flash from the browser** with your backup file (from `Desktop/xBloom-backups`) at address `0x0`.
 </details>
 
 <details>
@@ -143,9 +144,10 @@ Every week: Sunday checks the [original project](https://github.com/Mesh-one/Xbl
 <details>
 <summary>🇸🇦 <b>بالعربي باختصار</b></summary>
 
-- **التحديث بالواي فاي:** نزّل [ملف التحديث](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin)، ثم من اللوحة **الإعدادات ← تحديث البرنامج** وارفعه. إعداداتك تبقى.
-- **التثبيت بالكيبل بدون برامج:** نزّل [ملف الكيبل](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin)، افتح https://espressif.github.io/esptool-js/ في كروم، السرعة `115200` ثم **Connect**، العنوان `0x0`، ثم **Program**. ⛔ لا ترفعه من صفحة الواي فاي.
-- **أو بأمر واحد:** انسخ أمر الماك أو الويندوز من الطريقة 3 فوق. ينزّل آخر إصدار ويثبّته خلال دقائق بدون بناء، وإعداداتك تبقى. نفس الأمر للتحديث لاحقاً.
+- **التثبيت مرة وحدة بالكيبل، وبعدها التحديثات بالواي فاي تلقائياً.** وصفاتك وإعداداتك تبقى دائماً.
+- **بأمر واحد:** وصّل اللوحة بالكمبيوتر وانسخ أمر الماك أو الويندوز من فوق.
+- **أو من المتصفح بدون برامج:** نزّل [ملف الكيبل](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-FULL-USB-ONLY.bin)، افتح https://espressif.github.io/esptool-js/ في كروم، السرعة `115200` ثم **Connect**، العنوان `0x0`، ثم **Program**. ⛔ لا ترفعه من صفحة الواي فاي.
+- **بعد التثبيت:** لما يطلع إصدار جديد تسألك اللوحة. اضغط **موافق**، أو اختر **حدّث تلقائياً دائماً** وارتاح.
 </details>
 
 <div align="center">
