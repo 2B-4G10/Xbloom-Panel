@@ -17,7 +17,11 @@ LV_IMAGE_DECLARE(boot_logo);   // src/boot_logo.c
 LV_IMAGE_DECLARE(store_logo);  // src/store_logo.c
 
 namespace th {
-inline lv_color_t hex(uint32_t c) { return lv_color_hex(c); }
+// Not inline on purpose: inlined, GCC 14 for Xtensa may keep the colour as a
+// 3-byte constant in the code area and read it back with 16-bit loads, which the
+// ESP32-S3 refuses there (LoadStoreError). Opening a recipe crashed that way.
+// tools/check_code_loads.py checks every build for such loads.
+lv_color_t hex(uint32_t c);
 
 // ---- spacing (8-point grid) -------------------------------------------------
 const int SB = 36;       // status bar height
