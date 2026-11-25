@@ -12,6 +12,12 @@ on:
       backtrace:
         description: The panel's "Backtrace:" line (the 0x...:0x... pairs)
         required: true
+      pc:
+        description: Optional PC to disassemble around (e.g. 0x42086d59)
+        required: false
+      addrs:
+        description: Optional other addresses to look up (e.g. EXCVADDR, registers)
+        required: false
 
 permissions:
   contents: read
@@ -28,6 +34,8 @@ jobs:
       - name: Decode
         env:
           BT: ${{ inputs.backtrace }}
+          PC: ${{ inputs.pc }}
+          ADDRS: ${{ inputs.addrs }}
         run: |
           ELF=.pio/build/crowpanel-advance-43/firmware.elf
           A2L=$(ls ~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-addr2line)
@@ -38,5 +46,22 @@ jobs:
             for pc in $(echo "$BT" | grep -oE '0x4[0-9a-fA-F]{7}(:0x|$)' | sed 's/:0x$//'); do
               echo "$pc  $("$A2L" -pfiaC -e "$ELF" "$pc" | head -3 | tr '\n' ' ')"
             done
+            if [ -n "$ADDRS" ]; then
+              echo; echo 'Other addresses:'
+              for a in $ADDRS; do
+                echo "$a  $("$A2L" -pfiaC -e "$ELF" "$a" | head -2 | tr '\n' ' ')"
+              done
+            fi
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+          NM=$(ls ~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-nm)
+          OD=$(ls ~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump)
+          for a in $ADDRS; do
+            echo "== symbol containing $a"
+            "$NM" -nC "$ELF" | awk -v A=$((a)) '{ v=strtonum("0x"$1); if (v<=A) last=$0; else { print last; exit } }'
+            "$OD" -h "$ELF" | awk -v A=$((a)) 'NR>5 && NF>=6 { s=strtonum("0x"$4); n=strtonum("0x"$3); if (A>=s && A<s+n) print "section:", $2 }'
+          done
+          if [ -n "$PC" ]; then
+            echo "== disassembly around $PC"
+            "$OD" -dlC --start-address=$(( PC - 96 )) --stop-address=$(( PC + 16 )) "$ELF" | tail -n 80
+          fi
