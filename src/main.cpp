@@ -8,7 +8,9 @@
 #include <esp_heap_caps.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_rgb.h>
+#include <esp_core_dump.h>
 #include <esp_ota_ops.h>
+#include <esp_system.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <lvgl.h>
@@ -237,6 +239,26 @@ void *tls_calloc(size_t n, size_t size) {
 }
 void tls_free(void *p) { heap_caps_free(p); }
 
+// Why the panel last restarted, and where it crashed if it did (saved to the
+// coredump partition by the crash handler, read back here, then cleared).
+// Lower-case "backtrace" so the installer's start-up check doesn't take it for a new crash.
+void report_last_restart() {
+  static const char *const WHY[] = {"unknown", "power on", "reset button", "restart", "crash", "interrupt watchdog",
+                                    "task watchdog", "watchdog", "deep sleep", "power dip (brownout)", "SDIO", "USB",
+                                    "JTAG", "eFuse", "power glitch", "CPU lockup"};
+  const int r = (int)esp_reset_reason();
+  Serial.printf("[boot] last restart: %s\n", r >= 0 && r < (int)(sizeof WHY / sizeof *WHY) ? WHY[r] : "?");
+  esp_core_dump_summary_t *s = (esp_core_dump_summary_t *)malloc(sizeof(esp_core_dump_summary_t));
+  if (s && esp_core_dump_image_check() == ESP_OK && esp_core_dump_get_summary(s) == ESP_OK) {
+    Serial.printf("[crash] last crash: task %s, pc 0x%08x, firmware %.9s\n[crash] backtrace", s->exc_task,
+                  (unsigned)s->exc_pc, s->app_elf_sha256);
+    for (uint32_t i = 0; i < s->exc_bt_info.depth; i++) Serial.printf(" 0x%08x:0x0", (unsigned)s->exc_bt_info.bt[i]);
+    Serial.println();
+    esp_core_dump_image_erase();
+  }
+  free(s);
+}
+
 }  // namespace
 
 // The UI runs on Arduino's loop task. Its default 8 KB stack is too small for
@@ -250,6 +272,7 @@ void setup() {
   mbedtls_platform_set_calloc_free(tls_calloc, tls_free);  // before any TLS connection
   Serial.begin(115200);
   Serial.printf("\nxBloom Panel %s starting\n", FW_VERSION);
+  report_last_restart();
 #ifdef XB_EMULATOR
   emulator::start_display();
   emulator::start_network();
