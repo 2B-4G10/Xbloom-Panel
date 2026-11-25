@@ -1,0 +1,42 @@
+# Turns a panel's crash "Backtrace:" line into file names and line numbers.
+# Builds the firmware at the released version (same code, same tools) and runs
+# addr2line on the addresses; the result is in the run's log and summary.
+name: Decode a crash
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release the panel runs (e.g. v4.1.1-ds.19)
+        required: true
+      backtrace:
+        description: The panel's "Backtrace:" line (the 0x...:0x... pairs)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: ./.github/actions/build-firmware
+      - name: Decode
+        env:
+          BT: ${{ inputs.backtrace }}
+        run: |
+          ELF=.pio/build/crowpanel-advance-43/firmware.elf
+          A2L=$(ls ~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-addr2line)
+          echo "ELF SHA256: $(sha256sum "$ELF" | cut -c1-9)  (the panel prints its own as 'ELF file SHA256')"
+          {
+            echo '## Crash decoded'
+            echo '```'
+            for pc in $(echo "$BT" | grep -oE '0x4[0-9a-fA-F]{7}(:0x|$)' | sed 's/:0x$//'); do
+              echo "$pc  $("$A2L" -pfiaC -e "$ELF" "$pc" | head -3 | tr '\n' ' ')"
+            done
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

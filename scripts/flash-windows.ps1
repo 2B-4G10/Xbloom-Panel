@@ -11,6 +11,7 @@
 #   XBP_BAUD=115200        use one flashing speed (default: fastest that works, 921600 -> 460800 -> 115200)
 #   XBP_BACKUP=1           back up the panel first (Desktop\xBloom-backups, about 5-25 minutes)
 #   XBP_FRESH=1            erase everything too (Wi-Fi and xBloom sign-in reset)
+#   XBP_MONITOR=1          only watch what the panel prints (to report a crash), 5 minutes
 #   XBP_DOWNLOAD_ONLY=1    only download and check the firmware and esptool
 #   XBP_BUILD=1            build the firmware from source instead of downloading it (30-60 minutes,
 #                          needs Git and Python; see README)
@@ -118,6 +119,30 @@ if (-not $Port) {
     Read-Host '   Press Enter to look again' | Out-Null
   }
   Ok "Panel port: $Port"
+}
+
+if ($env:XBP_MONITOR) {
+  # Shows everything the panel prints (and saves it), to see why it restarts or crashes.
+  Step 'Watching the panel (5 minutes, or close the window to stop)'
+  $logFile = Join-Path $Desktop ("xbloom-panel-log-{0}.txt" -f (Get-Date -Format 'yyyyMMdd-HHmm'))
+  $sp = New-Object System.IO.Ports.SerialPort $Port, 115200
+  $sp.DtrEnable = $false; $sp.RtsEnable = $false
+  $sp.Open()
+  $sp.RtsEnable = $true; Start-Sleep -Milliseconds 150; $sp.RtsEnable = $false   # restart it, as RESET does
+  Warn 'The panel restarted. Now do what makes it crash (for example, tap a recipe).'
+  $end = (Get-Date).AddMinutes(5)
+  while ((Get-Date) -lt $end) {
+    $t = $sp.ReadExisting()
+    if ($t) {
+      Add-Content -Path $logFile -Value $t -NoNewline
+      $color = if ($t -match 'Guru|Backtrace|abort|panic|assert') { 'Yellow' } else { 'Gray' }
+      Write-Host $t -NoNewline -ForegroundColor $color
+    }
+    Start-Sleep -Milliseconds 100
+  }
+  $sp.Close()
+  Write-Host "`nSaved: $logFile" -ForegroundColor Green
+  return
 }
 
 Step 'Talking to the panel'

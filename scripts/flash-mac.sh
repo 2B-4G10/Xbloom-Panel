@@ -12,6 +12,7 @@
 #   XBP_BAUD=115200        use one flashing speed (default: fastest that works, 921600 → 460800 → 115200)
 #   XBP_BACKUP=1           back up the panel first (~/Desktop/xBloom-backups)
 #   XBP_FRESH=1            erase everything too (Wi-Fi and xBloom sign-in reset)
+#   XBP_MONITOR=1          only watch what the panel prints (to report a crash), 5 minutes
 #   XBP_DOWNLOAD_ONLY=1    only download and check the firmware and esptool
 #   XBP_BUILD=1            build the firmware from source instead (30–60 minutes; see README)
 set -euo pipefail
@@ -118,6 +119,19 @@ if [[ -z "$PORT" ]]; then
     n="$(ask "Which one is the panel? [1]")"; PORT="${PORTS[$(( ${n:-1} - 1 ))]}"
   fi
   ok "Panel port: $PORT"
+fi
+
+if [[ -n "${XBP_MONITOR:-}" ]]; then
+  # Shows everything the panel prints (and saves it), to see why it restarts or crashes.
+  step "Watching the panel (5 minutes, or Ctrl+C to stop)"
+  LOGF="$HOME/Desktop/xbloom-panel-log-$(date +%Y%m%d-%H%M).txt"
+  "$ESPTOOL" --chip esp32s3 -p "$PORT" --after hard-reset chip-id >/dev/null 2>&1 || true   # restart it, as RESET does
+  stty -f "$PORT" 115200 raw -echo
+  warn "The panel restarted. Now do what makes it crash (for example, tap a recipe)."
+  ( cat "$PORT" | tee "$LOGF" ) & MPID=$!
+  sleep 300; kill "$MPID" 2>/dev/null || true
+  printf '\n%sSaved: %s%s\n' "$grn" "$LOGF" "$rst"
+  exit 0
 fi
 
 step "Talking to the panel"
