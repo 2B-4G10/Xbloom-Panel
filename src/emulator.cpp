@@ -300,6 +300,11 @@ const Step PHASE_EN[] = {
     {Op::Wait, nullptr, 800},
     {Op::Shot, "en_20_wifi_connected", 0},
     {Op::TapAny, BACK_SYMBOLS, 1200},
+    // Online, the panel finds the latest release on GitHub and asks.
+    {Op::Expect, "Always Update Automatically", 90000},
+    {Op::Wait, nullptr, 600},
+    {Op::Shot, "en_20b_update_popup", 0},
+    {Op::Tap, "Cancel", 1200},
 
     {Op::Mark, "account", 0},
     {Op::Tap, "xBloom account", 1200},
@@ -340,6 +345,10 @@ const Step PHASE_EN[] = {
 
 const Step PHASE_AR[] = {
     {Op::Expect, "Grinder", 20000},
+    {Op::Expect, "Always Update Automatically", 90000},  // asked again after a restart
+    {Op::Wait, nullptr, 600},
+    {Op::Shot, "ar_00_update_popup", 0},
+    {Op::Tap, "Never Show This Again!", 1500},
     {Op::Wait, nullptr, 3000},
     {Op::Shot, "ar_01_home", 0},
     {Op::Tap, "Recipes", 1200},

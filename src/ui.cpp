@@ -830,6 +830,7 @@ lv_obj_t *st_wifi_val, *st_ver_val, *st_machine_val, *sw_clock, *sw_night, *st_s
 lv_obj_t *wf_list, *wf_status_title, *wf_status_sub, *wf_forget, *wf_scan_lbl;
 lv_obj_t *pw_title, *pw_ta, *pw_show_lbl;
 lv_obj_t *up_steps, *up_url, *up_ip, *up_bar, *up_status, *up_wifi_btn, *up_online, *up_action, *up_action_lbl;
+extern lv_obj_t *up_mode_dd;
 char pw_ssid[33];
 bool wf_scanning_shown = false;
 net::Wifi last_wifi = (net::Wifi)255;  // nothing shown yet
@@ -1378,12 +1379,20 @@ void build_update() {
   lv_bar_set_range(up_bar, 0, 100);
   up_status = text(card, "", &inter_20, hex(SUB));
   lv_obj_set_pos(up_status, 24, 144);
+  // When an update is out: ask (pop-up), install automatically, or don't remind.
+  lv_obj_t *mode_row = bare(card, 0, 168, cw, 48);
+  lv_obj_align(text(mode_row, "When an update is out", &inter_20, hex(TEXT)), LV_ALIGN_LEFT_MID, 24, 0);
+  up_mode_dd = dropdown(mode_row, "Ask me\nInstall automatically\nDon't remind me",
+                        [](lv_event_t *e) { net::set_update_mode(chosen(e) % 3); });
+  lv_obj_set_width(up_mode_dd, 260);
+  lv_obj_align(up_mode_dd, LV_ALIGN_RIGHT_MID, -12, 0);
+  lv_dropdown_set_selected(up_mode_dd, (uint32_t)LV_CLAMP(0, net::update_mode(), 2));
   up_steps = text(card, "", &inter_16, hex(MUTED));
-  lv_obj_set_pos(up_steps, 24, 196);
+  lv_obj_set_pos(up_steps, 24, 226);
   up_url = text(card, "", &inter_20b, hex(TEXT));
-  lv_obj_set_pos(up_url, 24, 220);
+  lv_obj_set_pos(up_url, 24, 248);
   up_ip = text(card, "", &inter_16, hex(SUB));
-  lv_obj_set_pos(up_ip, 24, 250);
+  lv_obj_set_pos(up_ip, 24, 276);
   lv_obj_align(text(card, "If an update ever fails to start, the panel goes back to this version by itself.", &inter_16,
                     hex(MUTED)),
                LV_ALIGN_BOTTOM_LEFT, 24, -20);
@@ -1440,6 +1449,110 @@ const char *wifi_summary(net::Wifi s) {
   }
 }
 
+// ---- "Update available" pop-up -------------------------------------------------------
+// Shown on the home screen when the panel finds a newer release, unless the person
+// chose otherwise: Ok installs now, Cancel asks again next start, Remind me Tomorrow
+// waits a day, Never Show This Again! leaves only the "Update ready" in Settings, and
+// Always Update Automatically installs this one and every later one by itself.
+extern lv_obj_t *cf_layer;
+lv_obj_t *up_prompt, *up_prompt_text, *up_mode_dd;
+int up_prompt_dismissed = 0;  // the release build Cancel was pressed for (until restart)
+
+void close_update_prompt() {
+  show(up_prompt, false);
+  up_prompt_dismissed = net::online_build();
+}
+
+void install_now() {
+  show(up_prompt, false);
+  open_update();
+  net::install_online();
+  refresh_update();
+}
+
+lv_obj_t *prompt_button(lv_obj_t *dialog, int x, int y, int w, int h, const char *label, uint32_t bg, uint32_t fg,
+                        const lv_font_t *font, lv_event_cb_t on_tap) {
+  lv_obj_t *b = box(dialog, x, y, w, h, bg, h / 2);
+  lv_obj_center(text(b, label, font, hex(fg)));
+  pressable(b);
+  on_click(b, on_tap);
+  return b;
+}
+
+void build_update_prompt() {
+  up_prompt = bare(lv_layer_top(), 0, 0, W, H);  // a dark veil over everything
+  lv_obj_set_style_bg_color(up_prompt, hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(up_prompt, LV_OPA_70, 0);
+  lv_obj_add_flag(up_prompt, LV_OBJ_FLAG_CLICKABLE);
+  const int dw = 560, pad = 28, iw = dw - 2 * pad, half = (iw - G) / 2;
+  const int y_small = 132, y_auto = y_small + 44 + 12, y_main = y_auto + 50 + 20, dh = y_main + 56 + pad;
+  lv_obj_t *dialog = box(up_prompt, 0, 0, dw, dh, 0x1C1C1E, 24);
+  lv_obj_center(dialog);
+  lv_obj_set_pos(text(dialog, "Update available \xe2\x9c\xa8", &inter_26b, hex(TEXT)), pad, pad);
+  up_prompt_text = text(dialog, "", &inter_16, hex(SUB));
+  lv_obj_set_width(up_prompt_text, iw);
+  lv_label_set_long_mode(up_prompt_text, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_line_space(up_prompt_text, 4, 0);
+  lv_obj_set_pos(up_prompt_text, pad, pad + 44);
+
+  prompt_button(dialog, pad, y_small, half, 44, "Remind me Tomorrow", 0x2C2C2E, SUB, &inter_16, [](lv_event_t *) {
+    net::snooze_update_day();
+    show(up_prompt, false);
+  });
+  prompt_button(dialog, pad + half + G, y_small, half, 44, "Never Show This Again!", 0x2C2C2E, SUB, &inter_16,
+                [](lv_event_t *) {
+                  net::set_update_mode(2);
+                  if (up_mode_dd) lv_dropdown_set_selected(up_mode_dd, 2);
+                  show(up_prompt, false);
+                });
+  prompt_button(dialog, pad, y_auto, iw, 50, "Always Update Automatically", 0x16351F, GREEN, &inter_20b,
+                [](lv_event_t *) {
+                  net::set_update_mode(1);
+                  if (up_mode_dd) lv_dropdown_set_selected(up_mode_dd, 1);
+                  install_now();
+                });
+  prompt_button(dialog, pad, y_main, half, 56, "Cancel", 0x2C2C2E, TEXT, &inter_20b,
+                [](lv_event_t *) { close_update_prompt(); });
+  prompt_button(dialog, pad + half + G, y_main, half, 56, "Ok", 0xFFFFFF, 0x000000, &inter_20b,
+                [](lv_event_t *) { install_now(); });
+  show(up_prompt, false);
+}
+
+void open_update_prompt() {
+  char line[160];
+  snprintf(line, sizeof line,
+           tr("Version %s is ready. Ok installs it now: about a minute, and your recipes and settings stay."),
+           net::online_version());
+  set_text(up_prompt_text, line);
+  lv_obj_move_foreground(up_prompt);
+  show(up_prompt, true);
+  lv_display_trigger_activity(nullptr);  // light the screen so it's seen
+}
+
+// Called with the other periodic refreshes.
+void update_prompt_tick() {
+  if (net::online_state() != net::Online::Available || net::update_state() == net::Upd::Receiving ||
+      net::update_state() == net::Upd::Done)
+    return;
+  const bool calm = lv_screen_active() == scr_home && !::ui::busy() && lv_obj_has_flag(modal, LV_OBJ_FLAG_HIDDEN) &&
+                    lv_obj_has_flag(cf_layer, LV_OBJ_FLAG_HIDDEN);
+  switch (net::update_mode()) {
+    case 1:  // automatic: after two quiet minutes, never mid-brew
+      if (calm && net::update_state() != net::Upd::Failed && lv_display_get_inactive_time(nullptr) > 120000) {
+        lv_display_trigger_activity(nullptr);
+        install_now();
+      }
+      break;
+    case 0:
+      if (calm && lv_obj_has_flag(up_prompt, LV_OBJ_FLAG_HIDDEN) && up_prompt_dismissed != net::online_build() &&
+          !net::update_snoozed()) {
+        open_update_prompt();
+      }
+      break;
+    default: break;  // don't remind: Settings still says "Update ready"
+  }
+}
+
 void refresh_net() {
   const net::Wifi s = net::state();
   show(sb_wifi, s != net::Wifi::Off);
@@ -1466,6 +1579,7 @@ void refresh_net() {
     set_text(wf_scan_lbl, net::scan_running() ? "Scanning..." : "Scan again");
   }
   if (lv_screen_active() == scr_update) refresh_update();
+  update_prompt_tick();
   static bool ready_shown = false;  // Settings › Software update says when one is ready
   const bool ready = net::online_state() == net::Online::Available;
   if (ready != ready_shown) {
@@ -3025,6 +3139,7 @@ void begin() {
   build_status_bar();
   build_modal();
   build_confirm();
+  build_update_prompt();
   build_clock();
   build_toast();
   lv_screen_load(scr_home);
@@ -3156,6 +3271,7 @@ void sim_show(int which, int recipe) {
                                                 [](const char *t) { printf("entered: %s\n", t); });
              break;
     case 34: te_submit(nullptr); break;
+    case 35: lv_screen_load(scr_home); open_update_prompt(); break;  // the "Update available" pop-up
   }
 }
 #endif

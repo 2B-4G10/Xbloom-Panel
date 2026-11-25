@@ -37,6 +37,12 @@ void check_online() {}
 Online online_state() { return Online::Available; }
 const char *online_version() { return "4.2.0"; }
 void install_online() {}
+int online_build() { return 30; }
+static int mode_ = 2;  // the preview shows the pop-up only where asked (case 35)
+int update_mode() { return mode_; }
+void set_update_mode(int m) { mode_ = m; }
+void snooze_update_day() {}
+bool update_snoozed() { return false; }
 bool pref_clock() { return true; }
 void set_pref_clock(bool) {}
 bool pref_night_off() { return false; }
