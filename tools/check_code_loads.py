@@ -3,8 +3,8 @@
 
     python3 tools/check_code_loads.py firmware.elf [objdump]
 
-On the ESP32-S3 the code area (0x40000000-0x44000000, flash or PSRAM mapped for
-instructions) only allows 32-bit reads; an l8ui/l16ui/l16si there crashes with
+On the ESP32-S3 the code area (instruction RAM 0x40370000-0x403E0000, and flash or
+PSRAM mapped for instructions at 0x42000000-0x44000000) only allows 32-bit reads; an l8ui/l16ui/l16si there crashes with
 LoadStoreError. The compiler can place small constants among the code (literal
 pools) and read them that way. This finds every l32r that loads an address
 inside the code area which is not the start of a function, followed within a
@@ -31,7 +31,7 @@ for line in out.splitlines():
     m = l32r.match(line)
     if m:
         target, sym = int(m.group(3), 16), m.group(4)
-        if 0x40000000 <= target < 0x44000000 and '+0x' in sym:
+        if (0x40370000 <= target < 0x403E0000 or 0x42000000 <= target < 0x44000000) and '+0x' in sym:
             pending[m.group(2)] = (target, sym, 8)
         else:
             pending.pop(m.group(2), None)
