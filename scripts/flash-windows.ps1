@@ -267,13 +267,8 @@ if ($log -match 'Guru Meditation|abort\(\)|Backtrace:') {
 }
 
 Write-Host "`nDone! The panel is restarting with the latest xBloom Panel by Double Shot." -ForegroundColor Green
-Write-Host "    To update later, run the same command again." -ForegroundColor DarkGray
+Write-Host "    Next time, update from the panel itself: Settings > Software update > Install." -ForegroundColor DarkGray
 
-# Debugging the restart some panels have when opening a recipe (this release only):
-# keep watching, and save a crash log to the Desktop the moment anything goes wrong.
-Step 'Watching for crashes (30 minutes; close this window when you are done)'
-Warn 'Use the panel normally: open recipes, brew. Every crash is saved to the Desktop right away.'
-Watch-Panel 30 $false
 }
 catch {
   Write-Host "`n[x] Stopped: $($_.Exception.Message)" -ForegroundColor Red

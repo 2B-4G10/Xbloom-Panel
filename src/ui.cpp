@@ -829,7 +829,7 @@ lv_obj_t *st_wifi_val, *st_ver_val, *st_machine_val, *sw_clock, *sw_night, *st_s
     *st_ccolor_dd;
 lv_obj_t *wf_list, *wf_status_title, *wf_status_sub, *wf_forget, *wf_scan_lbl;
 lv_obj_t *pw_title, *pw_ta, *pw_show_lbl;
-lv_obj_t *up_steps, *up_url, *up_ip, *up_bar, *up_status, *up_wifi_btn;
+lv_obj_t *up_steps, *up_url, *up_ip, *up_bar, *up_status, *up_wifi_btn, *up_online, *up_action, *up_action_lbl;
 char pw_ssid[33];
 bool wf_scanning_shown = false;
 net::Wifi last_wifi = (net::Wifi)255;  // nothing shown yet
@@ -894,7 +894,7 @@ int chosen(lv_event_t *e) { return (int)lv_dropdown_get_selected((lv_obj_t *)lv_
 // A compact dark drop-down at the right of a row.
 lv_obj_t *dropdown(lv_obj_t *in_row, const char *options, lv_event_cb_t changed) {
   lv_obj_t *d = lv_dropdown_create(in_row);
-  lv_dropdown_set_options_static(d, tr(options));
+  lv_dropdown_set_options(d, tr(options));  // copies and joins Arabic letters (the static version does not)
   lv_obj_set_size(d, 140, 38);
   lv_obj_align(d, LV_ALIGN_RIGHT_MID, -12, 0);
   lv_obj_set_style_bg_color(d, hex(0x2C2C2E), 0);
@@ -1276,28 +1276,59 @@ void open_password(const char *ssid) {
   });
 }
 
-// ---- software update: install a file from a phone or computer on the same Wi-Fi ----
+// ---- software update ----------------------------------------------------------------
+// The panel checks GitHub for a newer release by itself: one tap on Install downloads,
+// checks and installs it. A file from a phone or computer on the same Wi-Fi still works.
 void refresh_update() {
   const bool online = net::state() == net::Wifi::Connected;
+  const net::Upd state = net::update_state();
+  const net::Online found = net::online_state();
+  const bool installing = state == net::Upd::Receiving || state == net::Upd::Done;
+  char line[96];
+
   show(up_wifi_btn, !online);
+  const char *action = nullptr;
+  if (!online) {
+    set_text(up_online, "Connect the panel to Wi-Fi first.");
+  } else {
+    switch (found) {
+      case net::Online::Unknown:
+      case net::Online::Checking: set_text(up_online, "Checking for updates..."); break;
+      case net::Online::UpToDate:
+        set_text(up_online, "You're up to date");
+        action = "Check again";
+        break;
+      case net::Online::Available:
+        snprintf(line, sizeof line, tr("Version %s is ready"), net::online_version());
+        set_text(up_online, line);
+        action = "Install";
+        break;
+      case net::Online::Failed:
+        set_text(up_online, "Couldn't check for updates");
+        action = "Try again";
+        break;
+    }
+  }
+  set_text_color(up_online, hex(found == net::Online::Available && online ? GREEN : TEXT), 0);
+  show(up_action, online && action && !installing);
+  if (action) set_text(up_action_lbl, action);
+
+  show(up_steps, online);
   show(up_url, online);
   show(up_ip, online);
-  char line[80];
   if (online) {
-    set_text(up_steps, "On your phone or computer (same Wi-Fi), open:");
+    set_text(up_steps, "Or from your phone or computer (same Wi-Fi), open:");
     snprintf(line, sizeof line, "http://%s", net::hostname());
     set_text(up_url, line);
     snprintf(line, sizeof line, tr("or  http://%s     then choose the update file."), net::ip());
     set_text(up_ip, line);
-  } else {
-    set_text(up_steps, "Connect the panel to Wi-Fi first.");
   }
-  const net::Upd state = net::update_state();
+
   lv_bar_set_value(up_bar, state == net::Upd::Idle ? 0 : net::update_progress(), LV_ANIM_OFF);
   show(up_bar, state != net::Upd::Idle);
   uint32_t color = SUB;
   switch (state) {
-    case net::Upd::Idle: set_text(up_status, online ? "Waiting for the file..." : ""); break;
+    case net::Upd::Idle: set_text(up_status, ""); break;
     case net::Upd::Receiving:
       snprintf(line, sizeof line, tr("Installing... %d%%   Keep the panel powered."), net::update_progress());
       set_text(up_status, line);
@@ -1307,7 +1338,7 @@ void refresh_update() {
       color = GREEN;
       break;
     case net::Upd::Failed:
-      snprintf(line, sizeof line, tr("Failed: %s"), net::update_error());
+      snprintf(line, sizeof line, tr("Failed: %s"), tr(net::update_error()));
       set_text(up_status, line);
       color = 0xFF6B6B;
       break;
@@ -1322,28 +1353,37 @@ void build_update() {
     net::update_page(false);
     load(scr_home, Anim::PopRight);
   });
-  lv_obj_t *card = box(scr_update, M, 96, W - 2 * M, H - M - 96, 0x1C1C1E, R_SM);
+  const int cw = W - 2 * M;
+  lv_obj_t *card = box(scr_update, M, 96, cw, H - M - 96, 0x1C1C1E, R_SM);
   char version[48];
   snprintf(version, sizeof version, tr("Installed version %s"), FW_VERSION);
-  lv_obj_set_pos(text(card, version, &inter_20b, hex(TEXT)), 24, 22);
-  up_steps = text(card, "", &inter_20, hex(SUB));
-  lv_obj_set_pos(up_steps, 24, 72);
-  up_url = text(card, "", &inter_34b, hex(TEXT));
-  lv_obj_set_pos(up_url, 24, 106);
-  up_ip = text(card, "", &inter_20, hex(SUB));
-  lv_obj_set_pos(up_ip, 24, 160);
-  up_wifi_btn = pill(card, 24, 110, 240, 52, "Wi-Fi settings", 0xFFFFFF, 0x000000, [](lv_event_t *) {
+  lv_obj_set_pos(text(card, version, &inter_20, hex(SUB)), 24, 20);
+  up_online = text(card, "", &inter_26b, hex(TEXT));
+  lv_obj_set_pos(up_online, 24, 58);
+  up_action = pill(card, cw - 24 - 200, 50, 200, 52, "Install", 0xFFFFFF, 0x000000, [](lv_event_t *) {
+    if (net::online_state() == net::Online::Available) net::install_online();
+    else net::check_online();
+    refresh_update();
+  });
+  up_action_lbl = lv_obj_get_child(up_action, 0);
+  up_wifi_btn = pill(card, cw - 24 - 240, 50, 240, 52, "Wi-Fi settings", 0xFFFFFF, 0x000000, [](lv_event_t *) {
     net::update_page(false);
     open_wifi();
   });
   up_bar = lv_bar_create(card);
-  lv_obj_set_size(up_bar, W - 2 * M - 48, 10);
-  lv_obj_set_pos(up_bar, 24, 230);
+  lv_obj_set_size(up_bar, cw - 48, 10);
+  lv_obj_set_pos(up_bar, 24, 124);
   lv_obj_set_style_bg_color(up_bar, hex(0x2C2C2E), 0);
   lv_obj_set_style_bg_color(up_bar, hex(GREEN), LV_PART_INDICATOR);
   lv_bar_set_range(up_bar, 0, 100);
   up_status = text(card, "", &inter_20, hex(SUB));
-  lv_obj_set_pos(up_status, 24, 252);
+  lv_obj_set_pos(up_status, 24, 144);
+  up_steps = text(card, "", &inter_16, hex(MUTED));
+  lv_obj_set_pos(up_steps, 24, 196);
+  up_url = text(card, "", &inter_20b, hex(TEXT));
+  lv_obj_set_pos(up_url, 24, 220);
+  up_ip = text(card, "", &inter_16, hex(SUB));
+  lv_obj_set_pos(up_ip, 24, 250);
   lv_obj_align(text(card, "If an update ever fails to start, the panel goes back to this version by itself.", &inter_16,
                     hex(MUTED)),
                LV_ALIGN_BOTTOM_LEFT, 24, -20);
@@ -1426,6 +1466,13 @@ void refresh_net() {
     set_text(wf_scan_lbl, net::scan_running() ? "Scanning..." : "Scan again");
   }
   if (lv_screen_active() == scr_update) refresh_update();
+  static bool ready_shown = false;  // Settings › Software update says when one is ready
+  const bool ready = net::online_state() == net::Online::Available;
+  if (ready != ready_shown) {
+    ready_shown = ready;
+    set_text(st_ver_val, ready ? "Update ready" : FW_VERSION);
+    set_text_color(st_ver_val, hex(ready ? GREEN : MUTED), 0);
+  }
   if (!lv_obj_has_flag(clock_layer, LV_OBJ_FLAG_HIDDEN)) refresh_clock();
 }
 
@@ -3010,6 +3057,23 @@ void show_clock(bool on) {
     lv_obj_move_foreground(clock_layer);
   }
   show(clock_layer, on);
+}
+
+// Standby dimming, done on the picture: a black veil over everything, so the
+// backlight stays fully on. The board dims the backlight by pulsing it, and its
+// coil whines audibly at the in-between levels.
+void set_dim(uint8_t opa) {
+  static lv_obj_t *veil = nullptr;
+  if (!veil) {
+    veil = lv_obj_create(lv_layer_sys());
+    lv_obj_remove_style_all(veil);
+    lv_obj_set_size(veil, W, H);
+    lv_obj_set_style_bg_color(veil, lv_color_black(), 0);
+    lv_obj_remove_flag(veil, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(veil, LV_OBJ_FLAG_SCROLLABLE);
+  }
+  lv_obj_set_style_bg_opa(veil, opa, 0);
+  show(veil, opa > 0);
 }
 
 bool take_wake() {

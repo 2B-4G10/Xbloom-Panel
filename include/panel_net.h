@@ -8,6 +8,9 @@
 #ifndef FW_VERSION
 #define FW_VERSION "dev"
 #endif
+#ifndef FW_BUILD
+#define FW_BUILD 0  // the release build number (the N in v4.1.3-ds.N); set by CI, 0 locally
+#endif
 
 namespace net {
 
@@ -38,6 +41,15 @@ void update_page(bool enabled);
 Upd update_state();
 int update_progress();                // 0..100
 const char *update_error();
+
+// Updates straight from GitHub: the latest release is checked after Wi-Fi connects
+// (and every 12 hours, or on request); Install downloads it, checks its SHA-256 and
+// installs it, reporting through update_state() / update_progress() like the page.
+enum class Online : uint8_t { Unknown, Checking, UpToDate, Available, Failed };
+void check_online();                  // ask for a check now
+Online online_state();
+const char *online_version();         // e.g. "4.2.0" once a check found a release
+void install_online();                // download and install the release found
 
 // Saved panel settings
 bool pref_clock();                    // show a clock instead of a black screen

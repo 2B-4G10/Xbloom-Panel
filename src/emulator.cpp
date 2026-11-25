@@ -314,6 +314,7 @@ const Step PHASE_EN[] = {
 
     {Op::Mark, "update and store", 0},
     {Op::Tap, "Software update", 1500},
+    {Op::Expect, "Install", 60000},  // found the latest release on GitHub (real network)
     {Op::Shot, "en_23_update", 0},
     {Op::TapAny, BACK_SYMBOLS, 1200},
     {Op::Tap, "Double Shot", 1500},

@@ -145,13 +145,15 @@ enum class Screen { On, Dim, Clock, Off };
 Screen screen = Screen::On;
 bool ignore_touch = false;
 
-// Backlight levels sent to the helper MCU: 0 brightest ... 245 off.
-uint8_t backlight_level(Screen s) {
+// Backlight levels sent to the helper MCU: 0 brightest ... 245 off. Only full on
+// and off are used: the helper MCU dims by pulsing the backlight, and at the levels
+// in between its coil buzzes. Dim and the clock darken the picture instead.
+uint8_t backlight_level(Screen s) { return s == Screen::Off ? 245 : 0; }
+lv_opa_t picture_dim(Screen s) {
   switch (s) {
-    case Screen::On: return 0;
-    case Screen::Dim: return 122;
-    case Screen::Clock: return 184;
-    default: return 245;
+    case Screen::Dim: return LV_OPA_50;
+    case Screen::Clock: return LV_OPA_70;
+    default: return LV_OPA_TRANSP;
   }
 }
 
@@ -165,6 +167,7 @@ void set_screen(Screen s) {
   if (s == screen) return;
   screen = s;
   ui::show_clock(s == Screen::Clock);
+  ui::set_dim(picture_dim(s));
   uint8_t level = backlight_level(s);
   // Through LovyanGFX's I2C driver, which the touch polling also uses, so they never collide.
 #ifndef XB_EMULATOR

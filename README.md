@@ -43,9 +43,12 @@ A touchscreen that sits next to your **xBloom Studio** and runs it over Bluetoot
 
 ### 1️⃣ Over Wi-Fi: if the panel already runs xBloom Panel
 
+**From 4.2.0 on:** when a new version is out, **Settings → Software update** says so. Tap **Install**. The panel downloads it, checks it and restarts. Your settings stay. 🎉
+
+**Older versions,** or with no internet on the panel's Wi-Fi:
 1. Download [**the Wi-Fi update file**](https://github.com/2B-4G10/Xbloom-Panel/releases/latest/download/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin).
 2. On the panel: **Settings → Software update**. Open the address it shows on your phone.
-3. Choose the file and upload. The panel restarts. Your settings stay. 🎉
+3. Choose the file and upload. The panel restarts.
 
 ### 2️⃣ Over USB: new panel, no software needed
 
