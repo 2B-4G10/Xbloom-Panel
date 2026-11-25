@@ -109,7 +109,7 @@ Entry table[] = {
   {"Update ready", "تحديث جاهز"},
   {"Update available \xe2\x9c\xa8", "تحديث جديد \xe2\x9c\xa8"},
   {"Version %s is ready. Ok installs it now: about a minute, and your recipes and settings stay.",
-   "الإصدار %s جاهز. «موافق» يثبّته الآن: دقيقة تقريبًا، وتبقى وصفاتك وإعداداتك."},
+   "الإصدار %s جاهز. زر موافق يثبّته الآن: دقيقة تقريبًا، وتبقى وصفاتك وإعداداتك."},
   {"Remind me Tomorrow", "ذكّرني غدًا"},
   {"Never Show This Again!", "لا تُظهر هذا مجددًا!"},
   {"Always Update Automatically", "حدّث تلقائيًا دائمًا"},
