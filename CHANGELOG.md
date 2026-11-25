@@ -2,6 +2,19 @@
 
 All the good stuff, newest first. ☕ Every version is on the [releases page](https://github.com/2B-4G10/Xbloom-Panel/releases).
 
+## ☕ [4.1.2 · build 20](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.2-ds.20) · 2026-11-25
+
+> [!NOTE]
+> **Diagnostics release.** It helps track down a restart some panels have when opening a recipe.
+
+### 🔧 Under the hood
+- 🩺 **Crash reports that survive a restart:** if the panel ever crashes, it saves where, and prints it the next time it starts. It also prints why it last restarted: crash, watchdog, or a dip in USB power.
+- 💻 **Watch the panel from the installer:** set `XBP_MONITOR=1` before the README command to see and save everything the panel prints, for example to report a problem.
+
+### 🔄 Updating
+Use the README's one-line USB command this time, so the panel also gets room for the crash reports. A Wi-Fi update works too, just without the saved crash reports.
+
+
 ## ☕ [4.1.1 · build 19](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.1-ds.19) · 2026-11-24
 
 > [!IMPORTANT]
