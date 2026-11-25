@@ -44,6 +44,60 @@ function Download($url, $out) {
   }
 }
 
+# Watches the panel and saves a crash log to the Desktop the moment it crashes or
+# restarts (crash message, a new start-up, or the USB connection dropping).
+# Keeps going after each one. Stops after $Minutes or when the window is closed.
+function Watch-Panel([int]$Minutes, [bool]$Reset) {
+  $stamp = Get-Date -Format 'yyyyMMdd-HHmm'
+  $full = Join-Path $Desktop "xbloom-panel-log-$stamp.txt"
+  $script:recent = ''; $started = $false; $saveAt = $null; $why = ''; $crashes = 0
+  $sp = $null; $dropped = $false
+  function Save-Crash($reason) {
+    $f = Join-Path $Desktop ("xbloom-panel-CRASH-{0}.txt" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    Set-Content -Path $f -Value ("xBloom Panel crash log`r`nSeen: $reason`r`nTime: $(Get-Date)`r`n`r`n" + $script:recent)
+    Write-Host "`n  >> Crash log saved to the Desktop: $(Split-Path $f -Leaf)" -ForegroundColor Magenta
+  }
+  $end = (Get-Date).AddMinutes($Minutes)
+  while ((Get-Date) -lt $end) {
+    if (-not $sp) {
+      try {
+        $sp = New-Object System.IO.Ports.SerialPort $Port, 115200
+        $sp.DtrEnable = $false; $sp.RtsEnable = $false; $sp.Open()
+        if ($Reset) { $sp.RtsEnable = $true; Start-Sleep -Milliseconds 150; $sp.RtsEnable = $false; $Reset = $false }
+        if ($dropped) { Write-Host "`n  (USB connection back)" -ForegroundColor DarkGray; $dropped = $false }
+      } catch { $sp = $null; Start-Sleep -Milliseconds 500; continue }
+    }
+    $t = ''
+    try { $t = $sp.ReadExisting() } catch {
+      try { $sp.Dispose() } catch {}
+      $sp = $null; $dropped = $true; $crashes++
+      $why = 'USB connection dropped: the panel lost power or restarted its USB chip'
+      $script:recent += "`r`n[installer] $why ($(Get-Date -Format HH:mm:ss))`r`n"
+      Write-Host "`n  !! $why" -ForegroundColor Yellow
+      Save-Crash $why
+      continue
+    }
+    if ($t) {
+      Add-Content -Path $full -Value $t -NoNewline
+      $script:recent += $t
+      if ($script:recent.Length -gt 40000) { $script:recent = $script:recent.Substring($script:recent.Length - 40000) }
+      $color = if ($t -match 'Guru|Backtrace|abort|panic|assert|\[crash\]|last restart') { 'Yellow' } else { 'Gray' }
+      Write-Host $t -NoNewline -ForegroundColor $color
+      if ($t -match "(?m)^ready") { $started = $true }
+      if (-not $saveAt) {
+        if ($t -match 'Guru Meditation|abort\(\)|Backtrace:|stack overflow|\[crash\] last crash|last restart: (crash|.*watchdog|power)') { $why = 'crash message'; $saveAt = (Get-Date).AddSeconds(10) }
+        elseif ($started -and $t -match 'ESP-ROM:') { $why = 'the panel restarted'; $saveAt = (Get-Date).AddSeconds(10) }
+      }
+    }
+    if ($saveAt -and (Get-Date) -gt $saveAt) {   # a few seconds later, to include the restart's own report
+      $crashes++; Save-Crash $why; $saveAt = $null; $started = $false
+    }
+    Start-Sleep -Milliseconds 100
+  }
+  if ($sp) { try { $sp.Close() } catch {} }
+  Write-Host "`nFull log: $full  ($crashes crash(es) saved)" -ForegroundColor Green
+}
+
 try {
 New-Item -ItemType Directory -Force $Home2 -ErrorAction Stop | Out-Null
 
@@ -122,26 +176,9 @@ if (-not $Port) {
 }
 
 if ($env:XBP_MONITOR) {
-  # Shows everything the panel prints (and saves it), to see why it restarts or crashes.
-  Step 'Watching the panel (5 minutes, or close the window to stop)'
-  $logFile = Join-Path $Desktop ("xbloom-panel-log-{0}.txt" -f (Get-Date -Format 'yyyyMMdd-HHmm'))
-  $sp = New-Object System.IO.Ports.SerialPort $Port, 115200
-  $sp.DtrEnable = $false; $sp.RtsEnable = $false
-  $sp.Open()
-  $sp.RtsEnable = $true; Start-Sleep -Milliseconds 150; $sp.RtsEnable = $false   # restart it, as RESET does
-  Warn 'The panel restarted. Now do what makes it crash (for example, tap a recipe).'
-  $end = (Get-Date).AddMinutes(5)
-  while ((Get-Date) -lt $end) {
-    $t = $sp.ReadExisting()
-    if ($t) {
-      Add-Content -Path $logFile -Value $t -NoNewline
-      $color = if ($t -match 'Guru|Backtrace|abort|panic|assert') { 'Yellow' } else { 'Gray' }
-      Write-Host $t -NoNewline -ForegroundColor $color
-    }
-    Start-Sleep -Milliseconds 100
-  }
-  $sp.Close()
-  Write-Host "`nSaved: $logFile" -ForegroundColor Green
+  Step 'Watching the panel (30 minutes, or close the window to stop)'
+  Warn 'It restarts now. Then do what makes it crash (for example, tap a recipe).'
+  Watch-Panel 30 $true
   return
 }
 
@@ -220,7 +257,8 @@ try {
 $logFile = Join-Path $Home2 'panel-start.log'; Set-Content -Path $logFile -Value $log
 if ($log -match 'Guru Meditation|abort\(\)|Backtrace:') {
   Write-Host ($log -split "`n" | Select-String -Pattern 'Guru|Backtrace|reason|xBloom Panel|abort' | Out-String) -ForegroundColor Yellow
-  Die "The panel crashed while starting. Send a photo of the lines above (the full log is in $logFile)."
+  Copy-Item $logFile (Join-Path $Desktop ("xbloom-panel-CRASH-{0}.txt" -f (Get-Date -Format 'yyyyMMdd-HHmmss')))
+  Die "The panel crashed while starting. The crash log is on the Desktop: please send it."
 } elseif ($log -match "`nready") {
   $ver = ([regex]::Match($log, 'xBloom Panel (\S+) starting')).Groups[1].Value
   Ok "Panel started$(if ($ver) { " (version $ver)" })"
@@ -230,6 +268,12 @@ if ($log -match 'Guru Meditation|abort\(\)|Backtrace:') {
 
 Write-Host "`nDone! The panel is restarting with the latest xBloom Panel by Double Shot." -ForegroundColor Green
 Write-Host "    To update later, run the same command again." -ForegroundColor DarkGray
+
+# Debugging the restart some panels have when opening a recipe (this release only):
+# keep watching, and save a crash log to the Desktop the moment anything goes wrong.
+Step 'Watching for crashes (30 minutes; close this window when you are done)'
+Warn 'Use the panel normally: open recipes, brew. Every crash is saved to the Desktop right away.'
+Watch-Panel 30 $false
 }
 catch {
   Write-Host "`n[x] Stopped: $($_.Exception.Message)" -ForegroundColor Red

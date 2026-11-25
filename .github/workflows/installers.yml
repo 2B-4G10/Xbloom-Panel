@@ -19,6 +19,28 @@ permissions:
   contents: read
 
 jobs:
+  quick:
+    # Fast check (about 2 minutes): the scripts parse, and the normal download path works.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Scripts parse
+        shell: powershell
+        run: |
+          foreach ($f in 'scripts\flash-windows.ps1','scripts\build-windows.ps1') {
+            $errs = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$errs)
+            if ($errs) { $errs | ForEach-Object { Write-Host "$f : $($_.Extent.StartLineNumber): $($_.Message)" }; throw "$f has syntax errors" }
+            Write-Host "$f parses"
+          }
+      - name: Download path
+        shell: powershell
+        run: |
+          $env:XBP_DOWNLOAD_ONLY = '1'
+          $out = powershell -ExecutionPolicy Bypass -File scripts\flash-windows.ps1 *>&1 | Out-String; Write-Host $out
+          if ($out -notmatch 'Downloaded and checked') { throw 'The download path did not finish' }
+
   windows:
     runs-on: windows-latest
     timeout-minutes: 120
