@@ -2,6 +2,31 @@
 
 All the good stuff, newest first. ☕ Every version is on the [releases page](https://github.com/2B-4G10/Xbloom-Panel/releases).
 
+## ☕ [4.2.0 · build 22](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.2.0-ds.22) · 2026-11-25
+
+> [!TIP]
+> **This is the last update you install by hand.** From now on the panel finds new versions by itself: **Settings → Software update → Install**. ✨
+
+### ✨ New
+- 🛜 **One-tap updates.** The panel checks GitHub for a new version after it joins Wi-Fi, and twice a day after that. **Settings** shows **Update ready** in green when one is out. Tap **Install**, and the panel downloads it, verifies it against the release's checksum and restarts into it. Your recipes and settings stay.
+- 🔔 **A friendly pop-up when a new version is out.** Choose:
+  - **Ok** to install it now.
+  - **Cancel** to be asked again next time the panel starts.
+  - **Remind me Tomorrow** to wait a day.
+  - **Never Show This Again!** to see it only in Settings.
+  - **Always Update Automatically** to let the panel update itself after two quiet minutes, never mid-brew.
+
+  Change your mind anytime in **Software update → When an update is out**.
+- 📱 Installing a file from your phone still works, as a backup, from the same screen.
+
+### 🐞 Fixed
+- 🔇 **No more buzzing in standby.** The backlight used to dim by flickering, which made its coil whine. Now it stays fully on and the picture itself is darkened, so standby is silent.
+- 🇸🇦 **Arabic in the language menu** now shows with its letters joined and in the right order.
+
+### 🔄 Updating
+- **Last time by hand:** paste the README's one-line USB command, or upload the Wi-Fi update file from your phone. After that, updates are one tap on the panel.
+
+
 ## ☕ [4.1.3 · build 21](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.1.3-ds.21) · 2026-11-25
 
 > [!IMPORTANT]
