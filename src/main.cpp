@@ -149,11 +149,11 @@ bool ignore_touch = false;
 // and off are used: the helper MCU dims by pulsing the backlight, and at the levels
 // in between its coil buzzes. Dim and the clock darken the picture instead.
 uint8_t backlight_level(Screen s) { return s == Screen::Off ? 245 : 0; }
-lv_opa_t picture_dim(Screen s) {
+uint8_t picture_level(Screen s) {  // % of the Brightness setting
   switch (s) {
-    case Screen::Dim: return LV_OPA_50;
-    case Screen::Clock: return LV_OPA_70;
-    default: return LV_OPA_TRANSP;
+    case Screen::Dim: return 50;
+    case Screen::Clock: return 30;
+    default: return 100;
   }
 }
 
@@ -167,7 +167,7 @@ void set_screen(Screen s) {
   if (s == screen) return;
   screen = s;
   ui::show_clock(s == Screen::Clock);
-  ui::set_dim(picture_dim(s));
+  ui::set_dim(picture_level(s));
   uint8_t level = backlight_level(s);
   // Through LovyanGFX's I2C driver, which the touch polling also uses, so they never collide.
 #ifndef XB_EMULATOR
@@ -245,6 +245,8 @@ void tls_free(void *p) { heap_caps_free(p); }
 // Why the panel last restarted, and where it crashed if it did (saved to the
 // coredump partition by the crash handler, read back here, then cleared).
 // Lower-case "backtrace" so the installer's start-up check doesn't take it for a new crash.
+char crash_fields[600] = "";  // a crash to report, once the saved settings are loaded
+
 void report_last_restart() {
   static const char *const WHY[] = {"unknown", "power on", "reset button", "restart", "crash", "interrupt watchdog",
                                     "task watchdog", "watchdog", "deep sleep", "power dip (brownout)", "SDIO", "USB",
@@ -255,9 +257,19 @@ void report_last_restart() {
   if (s && esp_core_dump_image_check() == ESP_OK && esp_core_dump_get_summary(s) == ESP_OK) {
     Serial.printf("[crash] last crash: task %s, pc 0x%08x, firmware %.9s\n[crash] backtrace", s->exc_task,
                   (unsigned)s->exc_pc, s->app_elf_sha256);
-    for (uint32_t i = 0; i < s->exc_bt_info.depth; i++) Serial.printf(" 0x%08x:0x0", (unsigned)s->exc_bt_info.bt[i]);
+    char bt[400] = "";
+    for (uint32_t i = 0; i < s->exc_bt_info.depth; i++) {
+      Serial.printf(" 0x%08x:0x0", (unsigned)s->exc_bt_info.bt[i]);
+      const size_t n = strlen(bt);
+      snprintf(bt + n, sizeof bt - n, "%s0x%08x:0x0", n ? " " : "", (unsigned)s->exc_bt_info.bt[i]);
+    }
     Serial.println();
+    snprintf(crash_fields, sizeof crash_fields,
+             "\"reason\":\"%s\",\"task\":\"%.15s\",\"pc\":\"0x%08x\",\"bt\":\"%s\"",
+             r >= 0 && r < (int)(sizeof WHY / sizeof *WHY) ? WHY[r] : "?", s->exc_task, (unsigned)s->exc_pc, bt);
     esp_core_dump_image_erase();
+  } else if (r == 5 || r == 6 || r == 7 || r == 15) {  // watchdogs and lockups leave no crash record
+    snprintf(crash_fields, sizeof crash_fields, "\"reason\":\"%s\",\"task\":\"\",\"pc\":\"\",\"bt\":\"\"", WHY[r]);
   }
   free(s);
 }
@@ -290,6 +302,7 @@ void setup() {
 #endif
   const uint32_t logo_since = millis();
   net::begin();  // first: it loads the saved settings the UI shows
+  if (crash_fields[0]) net::set_crash_report(crash_fields);
   cloud::begin();
   ui::begin();
   ble_link::begin();

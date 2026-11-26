@@ -52,6 +52,20 @@ int pref_sleep_min() { return sleep_m; }
 void set_pref_sleep_min(int m) { sleep_m = m; }
 int pref_clock_color() { return ccolor; }
 void set_pref_clock_color(int c) { ccolor = c; }
+static int bright_ = 100;
+bool beta() { return false; }
+bool beta_password_ok(const char *) { return true; }
+void set_beta(bool) {}
+void set_crash_report(const char *) {}
+bool crash_report_waiting() { return false; }
+int crash_mode() { return 0; }
+void set_crash_mode(int) {}
+void send_crash_report() {}
+void drop_crash_report() {}
+const char *last_version() { return FW_VERSION; }  // no "What's new" in the previews (case 36 shows it)
+void set_last_version(const char *) {}
+int pref_brightness() { return bright_; }
+void set_pref_brightness(int p) { bright_ = p; }
 static int lang_pref = -1;
 int pref_lang() {
   if (lang_pref < 0) lang_pref = !getenv("SIM_LANG") ? 0 : !strcmp(getenv("SIM_LANG"), "ar") ? 1 : !strcmp(getenv("SIM_LANG"), "ar-en") ? 2 : 0;

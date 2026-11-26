@@ -55,6 +55,19 @@ int online_build();                   // the N of the release found (v4.20.XXX-d
 int update_mode();
 void set_update_mode(int m);
 void snooze_update_day();             // "Remind me tomorrow"
+// Beta updates: pre-releases too. Turning them on needs the beta password.
+bool beta();
+bool beta_password_ok(const char *password);
+void set_beta(bool on);
+
+// Crash reports: after a crash, the panel asks before sending what went wrong
+// (version, where it stopped). 0 ask, 1 always send, 2 never.
+void set_crash_report(const char *json_fields);  // from start-up, after a crash
+bool crash_report_waiting();          // one to ask about / to send
+int crash_mode();
+void set_crash_mode(int m);
+void send_crash_report();
+void drop_crash_report();
 bool update_snoozed();
 
 // Saved panel settings
@@ -66,6 +79,10 @@ int pref_sleep_min();                // screen off (or clock) after this many id
 void set_pref_sleep_min(int m);
 int pref_clock_color();              // 0 white, 1 blue, 2 brown
 void set_pref_clock_color(int c);
+int pref_brightness();               // 20..100 %, the picture (the backlight stays full: no buzz)
+void set_pref_brightness(int pct);
+const char *last_version();           // the version that ran before this start ("" the first time)
+void set_last_version(const char *v);
 int pref_lang();                     // 0 English, 1 Arabic
 void set_pref_lang(int l);
 

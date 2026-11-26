@@ -50,10 +50,12 @@ volatile bool web_up = false, mdns_up = false, ntp_up = false;
 // ---- saved settings -------------------------------------------------------------
 struct {
   bool clock = true, night_off = false;
-  int sleep_min = 3, clock_color = 0, lang = 0, upd_mode = 0;
+  int sleep_min = 3, clock_color = 0, lang = 0, upd_mode = 0, brightness = 100, crash_mode = 0;
+  bool beta = false;
   uint32_t snooze_until = 0;      // epoch seconds ("Remind me tomorrow")
 } prefs;
 uint32_t snooze_until_ms = 0;     // the same, when the clock isn't set yet
+bool prefs_beta() { return prefs.beta; }
 
 // ---- update upload --------------------------------------------------------------
 volatile bool page_open = false;  // only while Settings > Software update is on screen
@@ -75,11 +77,28 @@ void fail_update(const char *why) {
 
 // ---- updates from GitHub ------------------------------------------------------------
 constexpr const char *RELEASES = "https://github.com/2B-4G10/Xbloom-Panel/releases";
+constexpr const char *LATEST_ANY = "https://api.github.com/repos/2B-4G10/Xbloom-Panel/releases?per_page=1";  // beta
+constexpr const char *BACKEND = "https://xbloom-panel.scholar30.workers.dev";
+#ifdef XB_EMULATOR
+constexpr const char *BACKEND_QS = "?test=1";  // the backend checks test calls but keeps nothing
+#else
+constexpr const char *BACKEND_QS = "";
+#endif
+#ifdef XB_EMULATOR
+constexpr const char *BETA_SHA256 = "939a90f50b80feb7a3b83944fedc890e8f43dc00068932ec0e2b19a94004a02e";  // the test's own password
+#else
+constexpr const char *BETA_SHA256 = "3fa6feec7b45271dea571b4d9c6f9539db3887ea01ad63a29797719c163f6431";  // SHA-256 of the beta password
+#endif
+char g_panel_id[17] = "";          // random, made once: counts panels without knowing whose
+std::string g_crash;               // a crash report waiting (JSON fields), also kept in NVS
+volatile bool want_send_crash = false;
+uint32_t last_ping = 0;
+bool pinged = false;
 constexpr uint32_t RECHECK_MS = 12UL * 3600 * 1000;
 volatile net::Online g_online = net::Online::Unknown;
 volatile bool want_check = false, want_install = false;
 uint32_t last_check = 0;
-char g_online_ver[24] = "", g_online_tag[40] = "";
+char g_online_ver[24] = "", g_online_tag[40] = "", g_last_ver[24] = "";
 int g_online_build = 0;
 
 // The newest release is wherever /releases/latest redirects to (…/tag/v4.20.003-ds.25):
@@ -124,15 +143,29 @@ void finish(esp_http_client_handle_t http) {
   esp_http_client_cleanup(http);
 }
 
+bool fetch_text(const char *url, std::string &out);
+
 void check_latest() {
   g_online = net::Online::Checking;
   last_check = millis();
   char location[200] = "";
   int status = 0;
   int64_t length = 0;
-  const std::string url = std::string(RELEASES) + "/latest";
-  esp_http_client_handle_t http = open_url(url.c_str(), status, length, grab_location, location, false);
-  if (http) finish(http);
+  if (prefs_beta()) {
+    // Beta: the newest release of any kind, from the API ("tag_name":"v4.20.003-ds.25").
+    std::string reply;
+    if (fetch_text(LATEST_ANY, reply)) {
+      const size_t at = reply.find("\"tag_name\":\"");
+      if (at != std::string::npos) {
+        const size_t end = reply.find('"', at + 12);
+        snprintf(location, sizeof location, "/tag/%s", reply.substr(at + 12, end - at - 12).c_str());
+      }
+    }
+  } else {
+    const std::string url = std::string(RELEASES) + "/latest";
+    esp_http_client_handle_t http = open_url(url.c_str(), status, length, grab_location, location, false);
+    if (http) finish(http);
+  }
   // …/tag/v4.20.003-ds.25
   const char *tag = strstr(location, "/tag/");
   int build = 0;
@@ -168,7 +201,7 @@ bool fetch_text(const char *url, std::string &out) {
   if (!http) return false;
   char chunk[512];
   out.clear();
-  for (int n; status == 200 && out.size() < 4096 && (n = esp_http_client_read(http, chunk, sizeof chunk)) > 0;)
+  for (int n; status == 200 && out.size() < 16384 && (n = esp_http_client_read(http, chunk, sizeof chunk)) > 0;)
     out.append(chunk, n);
   finish(http);
   return status == 200 && !out.empty();
@@ -258,8 +291,57 @@ void install_latest() {
   ESP.restart();
 }
 
+// A small JSON POST to the backend; true on 200.
+bool post_backend(const char *path, const std::string &body) {
+  const std::string url = std::string(BACKEND) + path + BACKEND_QS;
+  esp_http_client_config_t cfg = {};
+  cfg.url = url.c_str();
+  cfg.method = HTTP_METHOD_POST;
+  cfg.timeout_ms = 15000;
+  cfg.crt_bundle_attach = esp_crt_bundle_attach;
+  cfg.keep_alive_enable = false;
+  esp_http_client_handle_t http = esp_http_client_init(&cfg);
+  if (!http) return false;
+  esp_http_client_set_header(http, "Content-Type", "application/json");
+  int status = 0;
+  if (esp_http_client_open(http, body.size()) == ESP_OK &&
+      esp_http_client_write(http, body.data(), body.size()) == (int)body.size()) {
+    esp_http_client_fetch_headers(http);
+    status = esp_http_client_get_status_code(http);
+  }
+  esp_http_client_close(http);
+  esp_http_client_cleanup(http);
+  return status == 200;
+}
+
+void backend_calls() {
+  // A crash report the person agreed to send.
+  if (want_send_crash && !g_crash.empty()) {
+    const std::string body = std::string("{\"id\":\"") + g_panel_id + "\",\"ver\":\"" FW_VERSION "\",\"build\":" +
+                             std::to_string(FW_BUILD) + "," + g_crash + "}";
+    if (post_backend("/v1/crash", body)) {
+      Serial.println("[report] crash report sent");
+      g_crash.clear();
+      settings.remove("crash");
+      want_send_crash = false;
+    }
+  }
+  // Once a day: this panel exists (a random ID, the version). Nothing else.
+  if (!pinged || millis() - last_ping > 24UL * 3600 * 1000) {
+    char body[120];
+    snprintf(body, sizeof body, "{\"id\":\"%s\",\"ver\":\"%s\",\"build\":%d,\"beta\":%s}", g_panel_id, FW_VERSION,
+             FW_BUILD, prefs_beta() ? "true" : "false");
+    pinged = true;
+    last_ping = millis();
+    const bool ok = post_backend("/v1/ping", body);
+    Serial.printf("[ping] %s\n", ok ? "ok" : "failed");
+    if (!ok) last_ping = millis() - 23UL * 3600 * 1000;  // try again in an hour
+  }
+}
+
 void online_updates() {
   if (g_wifi != net::Wifi::Connected || g_upd == net::Upd::Receiving) return;
+  backend_calls();
   if (want_install) {
     want_install = false;
     return install_latest();
@@ -576,6 +658,17 @@ void begin() {
   prefs.clock_color = settings.getInt("ccolor", 0);
   prefs.lang = settings.getInt("lang", 0);
   prefs.upd_mode = settings.getInt("updmode", 0);
+  prefs.brightness = settings.getInt("bright", 100);
+  prefs.beta = settings.getBool("beta", false);
+  prefs.crash_mode = settings.getInt("crashmode", 0);
+  g_crash = settings.getString("crash", "").c_str();
+  strlcpy(g_panel_id, settings.getString("pid", "").c_str(), sizeof g_panel_id);
+  if (strlen(g_panel_id) != 16) {
+    snprintf(g_panel_id, sizeof g_panel_id, "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
+    settings.putString("pid", g_panel_id);
+  }
+  if (!g_crash.empty() && prefs.crash_mode == 1) want_send_crash = true;
+  strlcpy(g_last_ver, settings.getString("lastver", "").c_str(), sizeof g_last_ver);
   prefs.snooze_until = settings.getUInt("snooze", 0);
   strlcpy(g_ssid, settings.getString("ssid", "").c_str(), sizeof g_ssid);
   strlcpy(g_password, settings.getString("pass", "").c_str(), sizeof g_password);
@@ -669,6 +762,41 @@ int pref_sleep_min() { return prefs.sleep_min; }
 void set_pref_sleep_min(int m) { prefs.sleep_min = m; settings.putInt("sleep", m); }
 int pref_clock_color() { return prefs.clock_color; }
 void set_pref_clock_color(int c) { prefs.clock_color = c; settings.putInt("ccolor", c); }
+int pref_brightness() { return prefs.brightness; }
+void set_pref_brightness(int pct) { prefs.brightness = pct; settings.putInt("bright", pct); }
+const char *last_version() { return g_last_ver; }
+void set_last_version(const char *v) {
+  strlcpy(g_last_ver, v, sizeof g_last_ver);
+  settings.putString("lastver", v);
+}
+bool beta() { return prefs.beta; }
+bool beta_password_ok(const char *password) {
+  uint8_t d[32];
+  mbedtls_sha256((const unsigned char *)password, strlen(password), d, 0);
+  char hexd[65];
+  for (int i = 0; i < 32; ++i) snprintf(hexd + 2 * i, 3, "%02x", d[i]);
+  return !strcmp(hexd, BETA_SHA256);
+}
+void set_beta(bool on) {
+  prefs.beta = on;
+  settings.putBool("beta", on);
+  want_check = true;
+}
+
+void set_crash_report(const char *json_fields) {
+  if (prefs.crash_mode == 2) return;
+  g_crash = json_fields;
+  settings.putString("crash", json_fields);
+  if (prefs.crash_mode == 1) want_send_crash = true;
+}
+bool crash_report_waiting() { return !g_crash.empty(); }
+int crash_mode() { return prefs.crash_mode; }
+void set_crash_mode(int m) { prefs.crash_mode = m; settings.putInt("crashmode", m); }
+void send_crash_report() { want_send_crash = true; }
+void drop_crash_report() {
+  g_crash.clear();
+  settings.remove("crash");
+}
 int pref_lang() { return prefs.lang; }
 void set_pref_lang(int l) { prefs.lang = l; settings.putInt("lang", l); }
 

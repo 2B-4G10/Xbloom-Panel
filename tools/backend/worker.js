@@ -3,6 +3,7 @@
 //  POST /v1/crash  {id, ver, build, reason, task, pc, bt}   a crash report the owner chose to send
 //  GET  /stats?key=…    panels active today / 7 / 30 days, by version (owner only)
 //  GET  /crashes?key=…  the latest crash reports (owner only)
+//  ?test=1 on a POST: the emulator test; checked, nothing kept
 // No IP addresses or personal data are stored: a panel is a random ID it made itself.
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS panels (id TEXT PRIMARY KEY, ver TEXT, build INTEGER, beta INTEGER, first_seen INTEGER, last_seen INTEGER)`,
@@ -35,6 +36,7 @@ export default {
     const now = Math.floor(Date.now() / 1000);
     if (url.pathname === "/v1/ping" && req.method === "POST") {
       let o; try { o = await body(req); } catch { return json({ ok: false }, 400); }
+      if (url.searchParams.has("test")) return json({ ok: true, test: true });  // the emulator test: checked, not kept
       await db.prepare(`INSERT INTO panels (id, ver, build, beta, first_seen, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?5)
         ON CONFLICT(id) DO UPDATE SET ver = ?2, build = ?3, beta = ?4, last_seen = ?5`)
         .bind(o.id, clip(o.ver, 24), o.build | 0, o.beta ? 1 : 0, now).run();
@@ -42,6 +44,7 @@ export default {
     }
     if (url.pathname === "/v1/crash" && req.method === "POST") {
       let o; try { o = await body(req); } catch { return json({ ok: false }, 400); }
+      if (url.searchParams.has("test")) return json({ ok: true, test: true });
       const recent = await db.prepare(`SELECT COUNT(*) n FROM crashes WHERE id = ?1 AND at > ?2`).bind(o.id, now - 3600).first();
       if (recent.n >= 5) return json({ ok: true, dropped: true });  // a panel in a crash loop sends at most 5 an hour
       await db.prepare(`INSERT INTO crashes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`)
