@@ -87,7 +87,7 @@ constexpr const char *BACKEND_QS = "";
 #ifdef XB_EMULATOR
 constexpr const char *BETA_SHA256 = "939a90f50b80feb7a3b83944fedc890e8f43dc00068932ec0e2b19a94004a02e";  // the test's own password
 #else
-constexpr const char *BETA_SHA256 = "3fa6feec7b45271dea571b4d9c6f9539db3887ea01ad63a29797719c163f6431";  // SHA-256 of the beta password
+constexpr const char *BETA_SHA256 = "1af32e6bf63007e62a5e35515bf620a829a006df7586ab076bf33315a9f0291d";  // SHA-256 of the beta password
 #endif
 char g_panel_id[17] = "";          // random, made once: counts panels without knowing whose
 std::string g_crash;               // a crash report waiting (JSON fields), also kept in NVS
