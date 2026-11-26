@@ -32,7 +32,7 @@ run() {  # name, test file, sources...
     echo "same      $name ($(wc -l <"$WORK/$name.new.txt") results)"
   else
     echo "CHANGED   $name"
-    diff "$WORK/$name.ref.txt" "$WORK/$name.new.txt" | head -20
+    diff "$WORK/$name.ref.txt" "$WORK/$name.new.txt" | head -${DIFF_LINES:-20}
     fail=1
   fi
 }

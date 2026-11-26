@@ -59,7 +59,7 @@ uint32_t intro_for = 0;     // recipe the brew-start animation last played for
 // Grinder, Brewer and Scale screens
 int g_size = 36, g_rpm = 90;
 bool grinding = false;
-int b_volume = 250, b_temp = 85;  // temperature as shown: 39 means room temperature, 96 boiling
+int b_volume = 250, b_temp = 85;  // temperature as shown: 39 means room temperature, then 40 to 99
 float b_flow = 3.5f;
 uint8_t b_pattern = xb::PAT_CIRCULAR;
 bool pouring = false;
@@ -2125,7 +2125,7 @@ void build_brewer() {
   value_card(scr_brewer, M, card_y(0), MOD_LEFT_W, card_h, "Volume", "ml", BREWER_FG, BREWER_FILL, &inter_64b, 30,
              500, 5, b_volume, "%.0f", [](double v, bool) { b_volume = (int)v; });
   value_card(scr_brewer, M, card_y(1), MOD_LEFT_W, card_h, "Temperature", "°C", BREWER_FG, BREWER_FILL, &inter_64b,
-             39, 96, 1, b_temp, "%.0f", [](double v, bool released) {
+             39, 99, 1, b_temp, "%.0f", [](double v, bool released) {
                b_temp = (int)v;
                if (released) post(BleCmdType::BrewerTemp, 0, 0, xb::temp_display_to_wire(b_temp));
              });
@@ -2434,7 +2434,7 @@ void adjust(Field f, int dir) {
     case F_GRIND: r.grind_size = (int)fmin(80, fmax(1, r.grind_size + dir * boost)); break;
     case F_RPM: r.rpm = (int)fmin(120, fmax(60, r.rpm + dir * 10)); break;
     case F_VOL: q.volume_ml = fmin(240, fmax(0, round(q.volume_ml) + dir * boost)); break;
-    case F_TEMP: q.temp_c = fmin(98, fmax(40, round(q.temp_c) + dir * (held ? 2 : 1))); break;
+    case F_TEMP: q.temp_c = fmin(99, fmax(40, round(q.temp_c) + dir * (held ? 2 : 1))); break;
     case F_WAIT: q.pause_s = (uint8_t)fmin(59, fmax(0, (int)q.pause_s + dir * (held ? 5 : 1))); break;
     case F_FLOW: q.flow = fmin(3.5, fmax(3.0, round((q.flow + dir * 0.1) * 10) / 10)); break;
     default: break;

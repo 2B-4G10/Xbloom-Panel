@@ -91,8 +91,14 @@ struct {
 xb::Recipe loaded;
 float scale_g = 0;
 
+double brewer_temp = -1;  // the last water temperature the panel sent the Brewer
+
 void command(const BleCmd &c) {
   Serial.printf("[machine] command %d\n", (int)c.type);
+  if (c.type == BleCmdType::BrewerTemp || c.type == BleCmdType::BrewerEnter || c.type == BleCmdType::BrewerStart) {
+    brewer_temp = c.type == BleCmdType::BrewerTemp ? c.x : c.type == BleCmdType::BrewerEnter ? c.x : c.z;
+    Serial.printf("[machine] brewer water %.1f C\n", brewer_temp);
+  }
   switch (c.type) {
     case BleCmdType::Load: {
       // The real frames, as the panel would send them.
@@ -232,6 +238,10 @@ const Step PHASE_EN[] = {
 
     {Op::Mark, "brewer", 0},
     {Op::Tap, "Brewer", 1200},
+    {Op::Call, "temp_max", 800},     // the dial goes all the way to 99 C ...
+    {Op::Expect, "99", 2000},
+    {Op::Call, "temp_is_99", 0},     // ... and the machine is told 99 C
+    {Op::Shot, "en_04a_brewer_99", 0},
     {Op::Tap, "Spiral", 600},
     {Op::TapAny, LV_SYMBOL_PLAY, 1500},
     {Op::Shot, "en_04_brewer_pouring", 0},
@@ -474,8 +484,23 @@ void emoji_card() {
   lv_screen_load(scr);
 }
 
+// Drags the Temperature card to its far end (the top of its range), as a finger would.
+void temp_to_max() {
+  lv_obj_t *name = visible("Temperature");
+  if (!name) return fail("find", "Temperature");
+  lv_area_t a;
+  lv_obj_get_coords(lv_obj_get_parent(name), &a);
+  tap({(int32_t)(a.x2 - 6), (int32_t)((a.y1 + a.y2) / 2)});
+}
+
 void call(const char *what) {
-  if (!strcmp(what, "clock_on")) ui::show_clock(true);
+  if (!strcmp(what, "temp_max")) temp_to_max();
+  else if (!strcmp(what, "temp_is_99")) {
+    char got[24];
+    snprintf(got, sizeof got, "%.1f C sent", brewer_temp);
+    if (brewer_temp == 99) pass("brewer water 99 C", got);
+    else fail("brewer water 99 C", got);
+  } else if (!strcmp(what, "clock_on")) ui::show_clock(true);
   else if (!strcmp(what, "clock_off")) ui::show_clock(false);
   else if (!strcmp(what, "emoji_card")) emoji_card();
   else if (!strcmp(what, "arabic") || !strcmp(what, "english")) {
