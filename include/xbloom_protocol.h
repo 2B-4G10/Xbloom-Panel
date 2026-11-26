@@ -65,7 +65,7 @@ static const int MAX_POURS = 9;
 
 struct Pour {
   double volume_ml = 60;   // 0..240
-  double temp_c = 92;      // 20 (room temp) .. 98 (boiling)
+  double temp_c = 92;      // 20 (room temp), 40 .. 99
   uint8_t pattern = PAT_SPIRAL;
   double flow = 3.0;       // 3.0..3.5 ml/s
   uint8_t pause_s = 0;     // wait after this pour, 0..59
@@ -109,7 +109,7 @@ Bytes frame_stop();
 // ---- Manual modules (the machine's Grinder / Brewer / Scale screens) -------
 // Pattern bytes on the wire: 0 = centered, 1 = circular, 2 = spiral.
 uint8_t pattern_to_byte(uint8_t api_pattern);
-double temp_display_to_wire(int display_c);  // 39 -> 20 (room temp), 96 -> 98 (boil)
+double temp_display_to_wire(int display_c);  // 39 -> 20 (room temp), 40..99 as they are
 
 Bytes frame_grinder_enter(int size, int rpm);  // go to grinder screen, set size/rpm (no motor)
 Bytes frame_grinder_start(int size, int rpm);

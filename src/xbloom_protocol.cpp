@@ -124,7 +124,7 @@ const char *validate(const Recipe &r) {
   for (int i = 0; i < r.n_pours; ++i) {
     const Pour &p = r.pours[i];
     if (p.volume_ml < 0 || p.volume_ml > 240) return "pour volume must be 0-240 ml";
-    if (p.temp_c < 20 || p.temp_c > 98) return "temperature must be 20-98 C";
+    if (p.temp_c < 20 || p.temp_c > 99) return "temperature must be 20-99 C";
     if (p.flow < 3.0 - 1e-9 || p.flow > 3.5 + 1e-9) return "flow must be 3.0-3.5";
     if (p.pause_s > 59) return "pause must be 0-59 s";
     if (p.pattern < PAT_CENTERED || p.pattern > PAT_CIRCULAR) return "bad pattern";
@@ -211,7 +211,7 @@ Bytes frame_resume() { return build_frame(CMD_BREW_RESUME); }
 Bytes frame_stop() { return build_frame(CMD_BREW_STOP); }
 
 uint8_t pattern_to_byte(uint8_t api) { return wire_pattern(api); }
-double temp_display_to_wire(int c) { return c <= 39 ? 20.0 : c >= 96 ? 98.0 : c; }  // RT and boil marks
+double temp_display_to_wire(int c) { return c <= 39 ? 20.0 : c > 99 ? 99.0 : c; }  // 39 is the room-temperature mark
 
 // Manual modules. Temperatures, flows and volumes travel as float bit patterns x10.
 Bytes frame_grinder_enter(int size, int rpm) { return frame_of_ints(8006, {(uint32_t)size, (uint32_t)rpm}); }
