@@ -41,6 +41,11 @@ runs:
         ~/.platformio/penv/bin/python -m pip install -q -r requirements-build.txt
         ~/.platformio/penv/bin/pio --version
 
+    # The highlights the panel shows once after updating, from the pending release notes.
+    - name: What's new
+      shell: bash
+      run: python3 tools/make_whats_new.py
+
     - name: Build
       shell: bash
       env:

@@ -120,6 +120,11 @@ int main(int argc, char **argv) {
   ui::sim_show(12, 0); run(1500); save("12_update.ppm");
   ui::sim_show(35, 0); run(800); save("12b_update_prompt.ppm");
   lv_obj_add_flag(lv_obj_get_child(lv_layer_top(), -1), LV_OBJ_FLAG_HIDDEN);
+  ui::sim_show(36, 0); run(800); save("12c_whats_new.ppm");
+  lv_obj_add_flag(lv_obj_get_child(lv_layer_top(), -1), LV_OBJ_FLAG_HIDDEN);
+  ui::sim_show(37, 0); run(800); save("12d_crash_prompt.ppm");
+  lv_obj_add_flag(lv_obj_get_child(lv_layer_top(), -1), LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(lv_obj_get_child(lv_layer_top(), -1), LV_OBJ_FLAG_HIDDEN);
   ui::sim_show(13, 0); run(1500); save("13_clock.ppm");
   ui::sim_show(14, 0); ui::sim_show(0, 0); run(1500); save("14_home_synced.ppm");
   ui::sim_show(18, 0); run(1500); save("15_created.ppm");

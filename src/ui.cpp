@@ -10,6 +10,7 @@
 // Layout follows one spacing system (ui_theme.h): a 36 px status bar, 24 px margins,
 // 16 px gaps, 20 px corners, and numbers lined up on their text baselines.
 #include "ui.h"
+#include "whats_new.h"
 
 #include <Arduino.h>
 #include <lvgl.h>
@@ -83,7 +84,10 @@ struct Col {  // one pour's bar on the recipe screen
 } d_cols[xb::MAX_POURS];
 int d_ncols = 0;
 lv_obj_t *gr_weight, *gr_play_icon, *gr_use, *br_weight, *br_timer, *br_play_icon;
-lv_obj_t *sc_value, *sc_unit, *sc_timer, *sc_play_icon;
+lv_obj_t *sc_value, *sc_unit, *sc_timer, *sc_play_icon, *sc_auto, *sc_auto_lbl, *sc_rate;
+bool sw_auto = false;         // start the stopwatch when water starts landing on the scale
+float sw_auto_ref = 0;        // the weight when Auto was armed
+float rate_w = 0; uint32_t rate_t = 0; float rate_gps = 0;  // pour rate, smoothed
 lv_obj_t *pat_btn[3], *unit_btn[3];
 lv_obj_t *toast, *toast_lbl;
 lv_timer_t *toast_timer;
@@ -826,11 +830,12 @@ void build_recipes_page(lv_obj_t *page) {
 // ============================================================================
 lv_obj_t *scr_wifi, *scr_pass, *scr_update;
 lv_obj_t *st_wifi_val, *st_ver_val, *st_machine_val, *sw_clock, *sw_night, *st_sync_val, *st_sync_btn, *st_sleep_dd,
-    *st_ccolor_dd;
+    *st_ccolor_dd, *st_bright;
 lv_obj_t *wf_list, *wf_status_title, *wf_status_sub, *wf_forget, *wf_scan_lbl;
 lv_obj_t *pw_title, *pw_ta, *pw_show_lbl;
 lv_obj_t *up_steps, *up_url, *up_ip, *up_bar, *up_status, *up_wifi_btn, *up_online, *up_action, *up_action_lbl;
 extern lv_obj_t *up_mode_dd;
+lv_obj_t *up_beta_sw;
 char pw_ssid[33];
 bool wf_scanning_shown = false;
 net::Wifi last_wifi = (net::Wifi)255;  // nothing shown yet
@@ -972,12 +977,30 @@ void build_settings_page(lv_obj_t *page) {
   set_text(st_ver_val, FW_VERSION);
 
   lv_obj_t *screen = section(page, "SCREEN", x2, y0, col_w, 4, rh);
-  sw_clock = toggle(row(screen, 0, rh, "Clock when idle", nullptr, nullptr), net::pref_clock(),
-                    [](lv_event_t *e) { net::set_pref_clock(switched_on(e)); });
+  // Brightness: the picture is darkened, never the backlight (that buzzes).
+  lv_obj_t *bright_row = row(screen, 0, rh, "Brightness", nullptr, nullptr);
+  st_bright = lv_slider_create(bright_row);
+  lv_obj_set_size(st_bright, col_w - 190, 8);
+  lv_obj_align(st_bright, LV_ALIGN_RIGHT_MID, -24, 0);
+  lv_slider_set_range(st_bright, 20, 100);
+  lv_slider_set_value(st_bright, net::pref_brightness(), LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(st_bright, hex(0x3A3A3C), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(st_bright, hex(0xFFFFFF), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(st_bright, hex(0xFFFFFF), LV_PART_KNOB);
+  lv_obj_set_style_pad_all(st_bright, 7, LV_PART_KNOB);
+  lv_obj_set_ext_click_area(st_bright, 18);
+  lv_obj_add_event_cb(st_bright, [](lv_event_t *e) {
+    net::set_pref_brightness((int)lv_slider_get_value((lv_obj_t *)lv_event_get_target(e)));
+    ::ui::refresh_brightness();
+  }, LV_EVENT_VALUE_CHANGED, nullptr);
   st_sleep_dd = dropdown(row(screen, 1, rh, "Sleep after", nullptr, nullptr), "1 min\n3 min\n5 min\n10 min\nNever",
                          [](lv_event_t *e) { net::set_pref_sleep_min(SLEEP_CHOICES[chosen(e) % 5]); });
-  st_ccolor_dd = dropdown(row(screen, 2, rh, "Clock colour", nullptr, nullptr), "White\nBlue\nBrown",
-                          [](lv_event_t *e) { net::set_pref_clock_color(chosen(e) % 3); });
+  // Idle clock: off, or on in a colour.
+  st_ccolor_dd = dropdown(row(screen, 2, rh, "Idle clock", nullptr, nullptr), "Off\nWhite\nBlue\nBrown", [](lv_event_t *e) {
+    const int c = chosen(e) % 4;
+    net::set_pref_clock(c > 0);
+    if (c > 0) net::set_pref_clock_color(c - 1);
+  });
   sw_night = toggle(row(screen, 3, rh, "Off at night (11 PM-6 AM)", nullptr, nullptr), net::pref_night_off(),
                     [](lv_event_t *e) { net::set_pref_night_off(switched_on(e)); });
   refresh_screen_prefs();
@@ -1008,7 +1031,7 @@ void refresh_screen_prefs() {
   const int m = net::pref_sleep_min();
   for (int i = 0; i < 5; ++i)
     if (SLEEP_CHOICES[i] == m) lv_dropdown_set_selected(st_sleep_dd, i);
-  lv_dropdown_set_selected(st_ccolor_dd, net::pref_clock_color() % 3);
+  lv_dropdown_set_selected(st_ccolor_dd, net::pref_clock() ? 1 + net::pref_clock_color() % 3 : 0);
 }
 void refresh_sync_row() {
   if (!st_sync_val) return;
@@ -1373,29 +1396,46 @@ void build_update() {
   });
   up_bar = lv_bar_create(card);
   lv_obj_set_size(up_bar, cw - 48, 10);
-  lv_obj_set_pos(up_bar, 24, 124);
+  lv_obj_set_pos(up_bar, 24, 114);
   lv_obj_set_style_bg_color(up_bar, hex(0x2C2C2E), 0);
   lv_obj_set_style_bg_color(up_bar, hex(GREEN), LV_PART_INDICATOR);
   lv_bar_set_range(up_bar, 0, 100);
-  up_status = text(card, "", &inter_20, hex(SUB));
-  lv_obj_set_pos(up_status, 24, 144);
+  up_status = text(card, "", &inter_16, hex(SUB));
+  lv_obj_set_pos(up_status, 24, 130);
   // When an update is out: ask (pop-up), install automatically, or don't remind.
-  lv_obj_t *mode_row = bare(card, 0, 168, cw, 48);
+  lv_obj_t *mode_row = bare(card, 0, 156, cw, 48);
   lv_obj_align(text(mode_row, "When an update is out", &inter_20, hex(TEXT)), LV_ALIGN_LEFT_MID, 24, 0);
   up_mode_dd = dropdown(mode_row, "Ask me\nInstall automatically\nDon't remind me",
                         [](lv_event_t *e) { net::set_update_mode(chosen(e) % 3); });
   lv_obj_set_width(up_mode_dd, 260);
   lv_obj_align(up_mode_dd, LV_ALIGN_RIGHT_MID, -12, 0);
   lv_dropdown_set_selected(up_mode_dd, (uint32_t)LV_CLAMP(0, net::update_mode(), 2));
+  // Beta updates: pre-releases too, behind a password.
+  lv_obj_t *beta_row = bare(card, 0, 206, cw, 48);
+  lv_obj_align(text(beta_row, "Beta updates", &inter_20, hex(TEXT)), LV_ALIGN_LEFT_MID, 24, 0);
+  up_beta_sw = toggle(beta_row, net::beta(), [](lv_event_t *e) {
+    if (!switched_on(e)) {
+      net::set_beta(false);
+      return;
+    }
+    lv_obj_remove_state(up_beta_sw, LV_STATE_CHECKED);  // on only with the password
+    net::update_page(false);
+    open_text_entry(tr("Beta password"), "", "Password", true, "Turn on", scr_update, [](const char *password) {
+      const bool ok = net::beta_password_ok(password);
+      if (ok) {
+        net::set_beta(true);
+        lv_obj_add_state(up_beta_sw, LV_STATE_CHECKED);
+      }
+      show_toast(ok ? "Beta updates on" : "Wrong password");
+      open_update();
+    });
+  });
   up_steps = text(card, "", &inter_16, hex(MUTED));
-  lv_obj_set_pos(up_steps, 24, 226);
+  lv_obj_set_pos(up_steps, 24, 264);
   up_url = text(card, "", &inter_20b, hex(TEXT));
-  lv_obj_set_pos(up_url, 24, 248);
+  lv_obj_set_pos(up_url, 24, 286);
   up_ip = text(card, "", &inter_16, hex(SUB));
-  lv_obj_set_pos(up_ip, 24, 276);
-  lv_obj_align(text(card, "If an update ever fails to start, the panel goes back to this version by itself.", &inter_16,
-                    hex(MUTED)),
-               LV_ALIGN_BOTTOM_LEFT, 24, -20);
+  lv_obj_set_pos(up_ip, 24, 314);
 }
 
 void open_update(lv_event_t *) {
@@ -1529,6 +1569,108 @@ void open_update_prompt() {
   lv_display_trigger_activity(nullptr);  // light the screen so it's seen
 }
 
+// ---- After a crash: ask before sending a report ------------------------------------------
+lv_obj_t *cr_layer;
+void build_crash_prompt() {
+  cr_layer = bare(lv_layer_top(), 0, 0, W, H);
+  lv_obj_set_style_bg_color(cr_layer, hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(cr_layer, LV_OPA_70, 0);
+  lv_obj_add_flag(cr_layer, LV_OBJ_FLAG_CLICKABLE);
+  const int dw = 560, pad = 28, iw = dw - 2 * pad, half = (iw - G) / 2;
+  const int y_always = 136, y_main = y_always + 44 + 16, dh = y_main + 56 + pad;
+  lv_obj_t *dialog = box(cr_layer, 0, 0, dw, dh, 0x1C1C1E, 24);
+  lv_obj_center(dialog);
+  lv_obj_set_pos(text(dialog, "The panel restarted after a problem", &inter_26b, hex(TEXT)), pad, pad);
+  lv_obj_t *body = text(dialog,
+                        "Send a short report so it can be fixed? It holds only the version and where the software "
+                        "stopped: nothing personal.",
+                        &inter_16, hex(SUB));
+  lv_obj_set_width(body, iw);
+  lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_line_space(body, 4, 0);
+  lv_obj_set_pos(body, pad, pad + 46);
+  prompt_button(dialog, pad, y_always, iw, 44, "Always send", 0x2C2C2E, SUB, &inter_16, [](lv_event_t *) {
+    net::set_crash_mode(1);
+    net::send_crash_report();
+    show(cr_layer, false);
+  });
+  prompt_button(dialog, pad, y_main, half, 56, "Not now", 0x2C2C2E, TEXT, &inter_20b, [](lv_event_t *) {
+    net::drop_crash_report();
+    show(cr_layer, false);
+  });
+  prompt_button(dialog, pad + half + G, y_main, half, 56, "Send", 0xFFFFFF, 0x000000, &inter_20b, [](lv_event_t *) {
+    net::send_crash_report();
+    show(cr_layer, false);
+    show_toast("Thanks! The report goes out when the panel is online.");
+  });
+  show(cr_layer, false);
+}
+
+void open_crash_prompt() {
+  lv_obj_move_foreground(cr_layer);
+  show(cr_layer, true);
+}
+
+void crash_prompt_tick() {
+  static bool asked = false;
+  if (asked || net::crash_mode() != 0 || !net::crash_report_waiting()) return;
+  if (lv_screen_active() != scr_home || ::ui::busy() || !lv_obj_has_flag(modal, LV_OBJ_FLAG_HIDDEN)) return;
+  asked = true;
+  open_crash_prompt();
+}
+
+// ---- "What's new" once after an update ------------------------------------------------
+lv_obj_t *wn_layer, *wn_title;
+void build_whats_new() {
+  wn_layer = bare(lv_layer_top(), 0, 0, W, H);
+  lv_obj_set_style_bg_color(wn_layer, hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(wn_layer, LV_OPA_70, 0);
+  lv_obj_add_flag(wn_layer, LV_OBJ_FLAG_CLICKABLE);
+  const int dw = 560, pad = 28;
+  lv_obj_t *dialog = box(wn_layer, 0, 0, dw, 380, 0x1C1C1E, 24);
+  lv_obj_center(dialog);
+  wn_title = text(dialog, "", &inter_26b, hex(TEXT));
+  lv_obj_set_pos(wn_title, pad, pad);
+  lv_obj_t *list = lv_label_create(dialog);
+  lv_obj_set_style_text_font(list, &inter_20, 0);
+  lv_obj_set_style_text_color(list, hex(SUB), 0);
+  lv_obj_set_style_text_line_space(list, 12, 0);
+  lv_obj_set_width(list, dw - 2 * pad);
+  lv_label_set_long_mode(list, LV_LABEL_LONG_DOT);
+  lv_obj_set_height(list, 380 - pad - 46 - 56 - pad - 24);
+  lv_obj_set_style_base_dir(list, LV_BASE_DIR_LTR, 0);  // the notes are in English
+  char buf[700];
+  lv_label_set_text(list, emoji::map(WHATS_NEW, buf, sizeof buf));
+  lv_obj_set_pos(list, pad, pad + 52);
+  lv_obj_t *ok = box(dialog, dw - pad - 200, 380 - pad - 56, 200, 56, 0xFFFFFF, 28);
+  lv_obj_center(text(ok, "Nice!", &inter_20b, hex(0x000000)));
+  pressable(ok);
+  on_click(ok, [](lv_event_t *) { show(wn_layer, false); });
+  show(wn_layer, false);
+}
+
+void open_whats_new() {
+  char title[64];
+  snprintf(title, sizeof title, tr("What's new in %s \xe2\x9c\xa8"), FW_VERSION);
+  set_text(wn_title, title);
+  lv_obj_move_foreground(wn_layer);
+  show(wn_layer, true);
+}
+
+// Once, on the first calm moment after starting a version that differs from the last one.
+void whats_new_tick() {
+  static bool done = false;
+  if (done) return;
+  if (!strcmp(net::last_version(), FW_VERSION)) return (void)(done = true);
+  const bool calm = lv_screen_active() == scr_home && !::ui::busy() && lv_obj_has_flag(modal, LV_OBJ_FLAG_HIDDEN) &&
+                    lv_obj_has_flag(up_prompt, LV_OBJ_FLAG_HIDDEN);
+  if (!calm) return;
+  done = true;
+  const bool updated = net::last_version()[0] != 0;  // not the very first start
+  net::set_last_version(FW_VERSION);
+  if (updated && WHATS_NEW[0]) open_whats_new();
+}
+
 // Called with the other periodic refreshes.
 void update_prompt_tick() {
   if (net::online_state() != net::Online::Available || net::update_state() == net::Upd::Receiving ||
@@ -1579,7 +1721,11 @@ void refresh_net() {
     set_text(wf_scan_lbl, net::scan_running() ? "Scanning..." : "Scan again");
   }
   if (lv_screen_active() == scr_update) refresh_update();
-  update_prompt_tick();
+  crash_prompt_tick();
+  if (lv_obj_has_flag(cr_layer, LV_OBJ_FLAG_HIDDEN)) {  // one pop-up at a time
+    whats_new_tick();
+    if (lv_obj_has_flag(wn_layer, LV_OBJ_FLAG_HIDDEN)) update_prompt_tick();
+  }
   static bool ready_shown = false;  // Settings › Software update says when one is ready
   const bool ready = net::online_state() == net::Online::Available;
   if (ready != ready_shown) {
@@ -2189,6 +2335,11 @@ void set_unit(int u, bool send) {
 }
 
 // Stopwatch: start from zero, pause; the next start begins again from zero.
+void refresh_auto() {
+  lv_obj_set_style_bg_color(sc_auto, hex(sw_auto ? SCALE_SEL : 0x262626), 0);
+  set_text_color(sc_auto_lbl, hex(sw_auto ? SCALE_FG : 0x9A9A9A), 0);
+}
+
 void toggle_stopwatch(lv_event_t *) {
   if (sw_running) {
     sw_elapsed += millis() - sw_start;
@@ -2197,8 +2348,32 @@ void toggle_stopwatch(lv_event_t *) {
     sw_elapsed = 0;
     sw_start = millis();
     sw_running = true;
+    rate_t = 0;
+    rate_gps = 0;
+    sw_auto = false;  // started: Auto has done its job
+    refresh_auto();
   }
   set_text(sc_play_icon, sw_running ? LV_SYMBOL_PAUSE : LV_SYMBOL_PLAY);
+  show(sc_rate, sw_running);
+}
+
+// Each scale reading: Auto starts the stopwatch once 1 g more than when it was armed
+// lands on the scale; while timing, the pour rate in g/s (smoothed over ~2 s).
+void scale_reading(float w) {
+  if (sw_auto && !sw_running && w - sw_auto_ref >= 1.0f) toggle_stopwatch(nullptr);
+  if (!sw_running) return;
+  const uint32_t now = millis();
+  if (rate_t && now - rate_t >= 250) {
+    const float gps = fmaxf(0, (w - rate_w) * 1000.0f / (now - rate_t));
+    rate_gps = rate_gps * 0.85f + gps * 0.15f;
+    char line[24];
+    snprintf(line, sizeof line, tr("%.1f g/s"), rate_gps);
+    set_text(sc_rate, line);
+  }
+  if (!rate_t || now - rate_t >= 250) {
+    rate_w = w;
+    rate_t = now;
+  }
 }
 
 void build_scale() {
@@ -2211,6 +2386,17 @@ void build_scale() {
   const int stopwatch = 48;
   round_button(scr_scale, M + MOD_LEFT_W - stopwatch, 96, stopwatch, LV_SYMBOL_PLAY, &lv_font_montserrat_16,
                &sc_play_icon, toggle_stopwatch);
+  // Auto: arm it, then pour; the stopwatch starts with the first gram.
+  sc_auto = box(scr_scale, M + MOD_LEFT_W - stopwatch - 10 - 84, 96, 84, stopwatch, 0x262626, stopwatch / 2);
+  sc_auto_lbl = text(sc_auto, "Auto", &inter_16, hex(0x9A9A9A));
+  lv_obj_center(sc_auto_lbl);
+  pressable(sc_auto);
+  on_click(sc_auto, [](lv_event_t *) {
+    if (sw_running) return;
+    sw_auto = !sw_auto;
+    sw_auto_ref = weight_g;
+    refresh_auto();
+  });
 
   const int card_h = MOD_BOTTOM - MOD_TOP;
   lv_obj_t *card = box(scr_scale, M, MOD_TOP, MOD_LEFT_W, card_h, BG_MOD, R);
@@ -2219,6 +2405,9 @@ void build_scale() {
   lv_obj_t *inner = box(card, 6, 6, MOD_LEFT_W - 12, card_h - 12, SCALE_FILL, R - 6);
   sc_value = text(inner, "0.0", &inter_96_num, hex(0x5FB5A4));
   sc_unit = text(inner, "g", &inter_34b, hex(0x5FB5A4));
+  sc_rate = text(inner, "", &inter_20, hex(0x5FB5A4));  // pour rate while timing
+  lv_obj_align(sc_rate, LV_ALIGN_BOTTOM_MID, 0, -14);
+  show(sc_rate, false);
   for (lv_obj_t *o : {sc_value, sc_unit}) {  // render_scale() places these itself
     lv_obj_add_flag(o, RTL_KEEP);
     lv_obj_set_style_base_dir(o, LV_BASE_DIR_LTR, 0);
@@ -2967,6 +3156,7 @@ void handle(const UiEvent &e) {
     case UiEvType::Link: set_link((LinkState)e.i, e.msg); break;
     case UiEvType::Weight:
       weight_g = e.f;
+      scale_reading(weight_g);
       if (fabsf(weight_g - wake_ref_weight) >= 2.0f) {  // a cup put down or lifted: wake the screen
         wake_ref_weight = weight_g;
         wake_req = true;
@@ -3140,8 +3330,11 @@ void begin() {
   build_modal();
   build_confirm();
   build_update_prompt();
+  build_whats_new();
+  build_crash_prompt();
   build_clock();
   build_toast();
+  set_dim(100);  // the Brightness setting
   lv_screen_load(scr_home);
   if (scr_splash) {
     lv_obj_delete(scr_splash);
@@ -3177,8 +3370,13 @@ void show_clock(bool on) {
 // Standby dimming, done on the picture: a black veil over everything, so the
 // backlight stays fully on. The board dims the backlight by pulsing it, and its
 // coil whines audibly at the in-between levels.
-void set_dim(uint8_t opa) {
-  static lv_obj_t *veil = nullptr;
+// The Brightness setting works the same way, so it never buzzes either.
+uint8_t dim_level = 100;
+lv_obj_t *veil = nullptr;
+void set_dim(uint8_t level) {
+  dim_level = level;
+  const int shown = net::pref_brightness() * level / 100;  // % of full
+  const lv_opa_t opa = (lv_opa_t)LV_CLAMP(0, 255 - shown * 255 / 100, 235);
   if (!veil) {
     veil = lv_obj_create(lv_layer_sys());
     lv_obj_remove_style_all(veil);
@@ -3190,6 +3388,8 @@ void set_dim(uint8_t opa) {
   lv_obj_set_style_bg_opa(veil, opa, 0);
   show(veil, opa > 0);
 }
+
+void refresh_brightness() { set_dim(dim_level); }
 
 bool take_wake() {
   const bool wake = wake_req;
@@ -3271,7 +3471,9 @@ void sim_show(int which, int recipe) {
                                                 [](const char *t) { printf("entered: %s\n", t); });
              break;
     case 34: te_submit(nullptr); break;
-    case 35: lv_screen_load(scr_home); open_update_prompt(); break;  // the "Update available" pop-up
+    case 35: lv_screen_load(scr_home); open_update_prompt(); break;
+    case 36: lv_screen_load(scr_home); open_whats_new(); break;
+    case 37: lv_screen_load(scr_home); open_crash_prompt(); break;  // after a crash  // "What's new" after an update  // the "Update available" pop-up
   }
 }
 #endif

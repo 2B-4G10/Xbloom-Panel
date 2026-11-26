@@ -11,7 +11,8 @@ bool busy();               // true while a recipe is loaded/brewing, grinding, p
                            // or an update is installing
 bool take_wake();          // true once after the machine did something worth waking the screen for
 void show_clock(bool on);  // full-screen clock used instead of a black screen
-void set_dim(uint8_t opa); // darkens the whole picture (0 = normal) for standby
+void refresh_brightness();  // after the Brightness setting changed
+void set_dim(uint8_t level);  // picture level for the screen state, in % of the brightness setting (100 = awake)
 }  // namespace ui
 
 #ifdef UI_SIM

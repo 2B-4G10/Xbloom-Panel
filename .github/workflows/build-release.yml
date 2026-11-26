@@ -24,6 +24,10 @@ on:
         description: Release even if nothing changed since the last release
         type: boolean
         default: false
+      beta:
+        description: "Beta: a pre-release, offered only to panels with Beta updates on (password)"
+        type: boolean
+        default: false
 
 concurrency:
   group: firmware-${{ github.ref }}-${{ github.event_name }}
@@ -46,7 +50,7 @@ jobs:
       - id: decide
         env:
           EVENT: ${{ github.event_name }}
-          FORCE: ${{ inputs.force || false }}
+          FORCE: ${{ inputs.force || inputs.beta || false }}
         run: |
           PREV=$(git tag --merged HEAD --list 'v*-ds.*' --sort=-creatordate | head -1)
           echo "prev=$PREV" >> "$GITHUB_OUTPUT"
@@ -109,6 +113,7 @@ jobs:
         env:
           VER: ${{ needs.build.outputs.version }}
           PREV: ${{ needs.check.outputs.prev }}
+          BETA: ${{ inputs.beta || false }}
         run: |
           TAG="v${VER}-ds.${GITHUB_RUN_NUMBER}"
           if [ -n "$PREV" ]; then RANGE=("$PREV..HEAD"); else RANGE=(-n 30 HEAD); fi
@@ -117,6 +122,7 @@ jobs:
             # friendly: emoji headings, what changed for the person at the panel);
             # otherwise the list of changes.
             NOTES=$(sed '/^<!--/,/-->/d' .github/release-notes.md 2>/dev/null | sed '/./,$!d')
+            if [ "$BETA" = true ]; then echo "> [!WARNING]"; echo "> 🧪 **Beta.** Offered only to panels with **Beta updates** on. It may have rough edges."; echo; fi
             echo "## ☕ What's new in $VER"
             echo
             if [ -n "$NOTES" ]; then
@@ -150,12 +156,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VER: ${{ needs.build.outputs.version }}
+          BETA: ${{ inputs.beta || false }}
         run: |
+          # A beta is a pre-release: /releases/latest (what every other panel follows) skips it.
+          if [ "$BETA" = true ]; then KIND=(--prerelease); TITLE="xBloom Panel $VER beta · Double Shot (build ${GITHUB_RUN_NUMBER})"
+          else KIND=(--latest); TITLE="xBloom Panel $VER · Double Shot (build ${GITHUB_RUN_NUMBER})"; fi
           gh release create "$TAG" dist/xbloom-panel-doubleshot-UPDATE-WiFi-or-USB.bin dist/xbloom-panel-doubleshot-FULL-USB-ONLY.bin dist/SHA256SUMS.txt \
-            --target "$GITHUB_SHA" --title "xBloom Panel $VER · Double Shot (build ${GITHUB_RUN_NUMBER})" \
-            --notes-file notes.md --latest
+            --target "$GITHUB_SHA" --title "$TITLE" --notes-file notes.md "${KIND[@]}"
 
+      # A beta keeps the notes for the real release, and stays out of the changelog.
       - name: Add it to CHANGELOG.md
+        if: ${{ !inputs.beta }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

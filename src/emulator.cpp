@@ -254,6 +254,11 @@ const Step PHASE_EN[] = {
     {Op::Shot, "en_05_scale_oz", 0},
     {Op::Tap, "g", 400},
     {Op::Tap, "T", 600},
+    {Op::Tap, "Auto", 400},          // arm Auto, then pour: the stopwatch starts by itself
+    {Op::Call, "pour_on_scale", 2600},
+    {Op::Call, "timing", 0},
+    {Op::Shot, "en_05b_scale_auto", 0},
+    {Op::TapAny, LV_SYMBOL_PAUSE, 600},
     {Op::TapAny, BACK_SYMBOLS, 1200},
 
     {Op::Mark, "recipes", 0},
@@ -315,6 +320,12 @@ const Step PHASE_EN[] = {
     {Op::Wait, nullptr, 600},
     {Op::Shot, "en_20b_update_popup", 0},
     {Op::Tap, "Cancel", 1200},
+    // After a crash the panel asks; Send delivers the report to the backend.
+    {Op::Call, "fake_crash", 0},
+    {Op::Expect, "The panel restarted after a problem", 8000},
+    {Op::Shot, "en_20c_crash_prompt", 0},
+    {Op::Tap, "Send", 20000},
+    {Op::Call, "crash_sent", 0},
 
     {Op::Mark, "account", 0},
     {Op::Tap, "xBloom account", 1200},
@@ -331,6 +342,12 @@ const Step PHASE_EN[] = {
     {Op::Tap, "Software update", 1500},
     {Op::Expect, "Install", 60000},  // found the latest release on GitHub (real network)
     {Op::Shot, "en_23_update", 0},
+    {Op::Call, "beta_switch", 1200},  // beta updates need the password (the emulator build has its own)
+    {Op::Type, "emulator-beta-test", 200},
+    {Op::Tap, "Turn on", 800},
+    {Op::Expect, "Beta updates on", 3000},
+    {Op::Expect, "Install", 60000},   // checked again, now including pre-releases
+    {Op::Shot, "en_23a_update_beta", 0},
     {Op::Tap, "Install", 1000},      // downloads it and checks its SHA-256 (not installed here)
     {Op::Expect, "Installed. Restarting...", 300000},
     {Op::Shot, "en_23b_update_verified", 0},
@@ -493,8 +510,36 @@ void temp_to_max() {
   tap({(int32_t)(a.x2 - 6), (int32_t)((a.y1 + a.y2) / 2)});
 }
 
+// Taps the switch in the row whose name is `english` (rows: name on the left, switch on the right).
+void tap_switch(const char *english) {
+  lv_obj_t *name = visible(english);
+  if (!name) return fail("find", english);
+  lv_obj_t *row = lv_obj_get_parent(name);
+  for (uint32_t i = 0; i < lv_obj_get_child_count(row); ++i) {
+    lv_obj_t *c = lv_obj_get_child(row, i);
+    if (lv_obj_check_type(c, &lv_switch_class)) {
+      lv_area_t a;
+      lv_obj_get_coords(c, &a);
+      return tap({(int32_t)((a.x1 + a.x2) / 2), (int32_t)((a.y1 + a.y2) / 2)});
+    }
+  }
+  fail("find switch", english);
+}
+
 void call(const char *what) {
-  if (!strcmp(what, "temp_max")) temp_to_max();
+  if (!strcmp(what, "fake_crash")) {  // as start-up does after a real crash
+    net::set_crash_report("\"reason\":\"crash\",\"task\":\"loopTask\",\"pc\":\"0x4200abcd\",\"bt\":\"0x4200abcd:0x0\"");
+  } else if (!strcmp(what, "crash_sent")) {
+    if (!net::crash_report_waiting()) pass("crash report", "sent to the backend");
+    else fail("crash report", "still waiting");
+  } else if (!strcmp(what, "beta_switch")) tap_switch("Beta updates");
+  else if (!strcmp(what, "pour_on_scale")) {  // water landing on the scale, a few grams at a time
+    const float grams[] = {0.4f, 1.6f, 4.0f, 7.5f, 11.0f, 15.0f, 19.0f};
+    for (int i = 0; i < 7; ++i) send(UiEvType::Weight, 0, grams[i], nullptr, true, 300 * (i + 1));
+  } else if (!strcmp(what, "timing")) {
+    if (ui::busy()) pass("stopwatch", "started by Auto");
+    else fail("stopwatch", "not started by Auto");
+  } else if (!strcmp(what, "temp_max")) temp_to_max();
   else if (!strcmp(what, "temp_is_99")) {
     char got[24];
     snprintf(got, sizeof got, "%.1f C sent", brewer_temp);
