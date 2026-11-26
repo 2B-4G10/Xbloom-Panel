@@ -2,6 +2,12 @@
 
 All the good stuff, newest first. ☕ Every version is on the [releases page](https://github.com/2B-4G10/Xbloom-Panel/releases).
 
+## ☕ [4.2.0 · build 23](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.2.0-ds.23) · 2026-11-26
+
+- README: install once by cable, then updates over Wi-Fi; simpler
+- Changelog for v4.2.0-ds.22 [skip ci]
+
+
 ## ☕ [4.2.0 · build 22](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.2.0-ds.22) · 2026-11-25
 
 > [!TIP]
