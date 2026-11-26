@@ -12,6 +12,7 @@ on:
       - "scripts/**"
       - "platformio.ini"
       - "requirements-build.txt"
+      - "requirements-build-overrides.txt"
       - ".github/workflows/installers.yml"
   workflow_dispatch:
 

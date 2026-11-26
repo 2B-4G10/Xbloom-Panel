@@ -106,6 +106,8 @@ if ($have -ne $want) {
   & $PenvPy -m pip uninstall -y -q platformio 2>$null | Out-Null   # stock core, if an older install left it
   Run $PenvPy @('-m','pip','install','-q','--force-reinstall',$PioPkg)
 }
+# starlette newer than pioarduino asks for: security fixes, used only by `pio home` (requirements-build-overrides.txt)
+& $PenvPy -m pip install -q --upgrade 'starlette>=1.3.1' 2>$null | Out-Null
 Ok (& $Pio --version)
 
 Step 'esptool (for the backup and the flash)'
