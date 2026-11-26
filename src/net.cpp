@@ -82,7 +82,7 @@ uint32_t last_check = 0;
 char g_online_ver[24] = "", g_online_tag[40] = "";
 int g_online_build = 0;
 
-// The newest release is wherever /releases/latest redirects to (…/tag/v4.2.0-ds.25):
+// The newest release is wherever /releases/latest redirects to (…/tag/v4.20.003-ds.25):
 // no API call, so no rate limit.
 esp_err_t grab_location(esp_http_client_event_t *e) {
   if (e->event_id == HTTP_EVENT_ON_HEADER && !strcasecmp(e->header_key, "Location"))
@@ -133,7 +133,7 @@ void check_latest() {
   const std::string url = std::string(RELEASES) + "/latest";
   esp_http_client_handle_t http = open_url(url.c_str(), status, length, grab_location, location, false);
   if (http) finish(http);
-  // …/tag/v4.2.0-ds.25
+  // …/tag/v4.20.003-ds.25
   const char *tag = strstr(location, "/tag/");
   int build = 0;
   const char *ds = tag ? strstr(tag, "-ds.") : nullptr;
