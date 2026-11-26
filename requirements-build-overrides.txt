@@ -4,3 +4,7 @@
 # `pio home` (PlatformIO's web dashboard), never by the firmware build, so the newer one is
 # safe here. Drop this line once the platform moves to a pioarduino that allows it.
 starlette>=1.3.1
+# The ESP32 platform installs cryptography (>=45) into the same environment, and a cached
+# environment keeps an old one: 46.x has known vulnerabilities (PYSEC-2026-3552/3553/3554,
+# GHSA-537c-gmf6-5ccf). 50 works with the platform's tools (esptool, esp-coredump).
+cryptography>=50.0.0
