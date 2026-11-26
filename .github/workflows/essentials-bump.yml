@@ -54,7 +54,11 @@ jobs:
           CORE=$(curl -fsSL "https://raw.githubusercontent.com/pioarduino/platform-espressif32/$NEW/builder/penv_setup.py" \
                  | sed -n 's/.*"pioarduino": *">=\([0-9][^"]*\)".*/\1/p' | head -1)
           if [ -z "$CORE" ]; then echo "::error::Couldn't find the pioarduino core version platform $NEW needs."; exit 1; fi
-          echo "Platform $NEW needs pioarduino $CORE."
+          echo "Platform $NEW needs pioarduino $CORE or newer."
+          # The newest pioarduino at or above that (newer releases carry dependency security fixes).
+          LATEST=$(python3 -m pip index versions pioarduino 2>/dev/null | sed -n 's/^pioarduino (\(.*\))$/\1/p')
+          if [ -n "$LATEST" ] && [ "$(printf '%s\n%s\n' "$CORE" "$LATEST" | sort -V | tail -1)" = "$LATEST" ]; then CORE=$LATEST; fi
+          echo "Using pioarduino $CORE."
           sed -i "s#/releases/download/$CUR/platform-espressif32.zip#/releases/download/$NEW/platform-espressif32.zip#" platformio.ini
           sed -i "s#^pioarduino==.*#pioarduino==$CORE#" requirements-build.txt
           git diff
