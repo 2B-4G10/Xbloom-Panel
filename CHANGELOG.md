@@ -2,6 +2,21 @@
 
 All the good stuff, newest first. ☕ Every version is on the [releases page](https://github.com/2B-4G10/Xbloom-Panel/releases).
 
+## ☕ [4.20.001 · build 24](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.20.001-ds.24) · 2026-11-26
+
+### ✨ New
+- ☀️ **Brightness.** A slider in **Settings → Screen**. It dims the picture, not the backlight, so it stays silent.
+- 🎁 **What's new.** After an update, the panel shows a short list of what changed, once.
+- ⏱️ **Auto-start timer on the Scale.** Tap **Auto**, then pour: the stopwatch starts with the first gram, and shows your pour rate in g/s.
+- 🧯 **Crash reports, only if you agree.** If the panel ever restarts after a problem, it asks before sending a short technical report (version and where it stopped, nothing personal), so it can be fixed fast.
+
+### 🐞 Fixed
+- 🌡️ **Brewer water up to 99 °C.** The dial stopped at 96. Every degree you pick is now sent as is.
+
+### 🪄 Tidier
+- 🕰️ **Idle clock** is one setting now: Off, White, Blue or Brown.
+
+
 ## ☕ [4.2.0 · build 23](https://github.com/2B-4G10/Xbloom-Panel/releases/tag/v4.2.0-ds.23) · 2026-11-26
 
 - README: install once by cable, then updates over Wi-Fi; simpler
