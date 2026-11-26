@@ -70,6 +70,17 @@ jobs:
       version: ${{ steps.fw.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+      # Releases are numbered 4.20.XXX: only XXX goes up, by one per release (4.20.001, 4.20.002, ...).
+      - name: Set the version (4.20.XXX)
+        if: needs.check.outputs.release == 'true'
+        env:
+          PREV: ${{ needs.check.outputs.prev }}
+        run: |
+          N=$(echo "$PREV" | sed -n 's/^v4\.20\.\([0-9]\+\)-ds\..*/\1/p')
+          V=$(printf '4.20.%03d' $((10#${N:-0} + 1)))
+          sed -i "s/-DFW_VERSION='\"[^\"]*\"'/-DFW_VERSION='\"$V\"'/" platformio.ini
+          grep FW_VERSION platformio.ini
+          echo "This release is $V (previous: ${PREV:-none})"
       - id: fw
         uses: ./.github/actions/build-firmware
       - uses: actions/upload-artifact@v7

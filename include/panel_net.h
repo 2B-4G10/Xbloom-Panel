@@ -48,9 +48,9 @@ const char *update_error();
 enum class Online : uint8_t { Unknown, Checking, UpToDate, Available, Failed };
 void check_online();                  // ask for a check now
 Online online_state();
-const char *online_version();         // e.g. "4.2.0" once a check found a release
+const char *online_version();         // e.g. "4.20.003" once a check found a release
 void install_online();                // download and install the release found
-int online_build();                   // the N of the release found (v4.2.0-ds.N)
+int online_build();                   // the N of the release found (v4.20.XXX-ds.N)
 // What to do when one is found: 0 ask (pop-up), 1 install automatically, 2 don't remind.
 int update_mode();
 void set_update_mode(int m);
