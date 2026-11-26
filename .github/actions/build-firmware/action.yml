@@ -38,8 +38,18 @@ runs:
         python -m venv ~/.platformio/penv
         ~/.platformio/penv/bin/python -m pip install -q --upgrade pip
         ~/.platformio/penv/bin/python -m pip uninstall -y -q platformio || true
-        ~/.platformio/penv/bin/python -m pip install -q -r requirements-build.txt
+        # --upgrade: a cached environment still gets the newest allowed versions (security fixes).
+        ~/.platformio/penv/bin/python -m pip install -q --upgrade --upgrade-strategy eager -r requirements-build.txt
         ~/.platformio/penv/bin/pio --version
+
+    # Known vulnerabilities in the build tools (they run on the build machine, not on the panel).
+    - name: Check the build tools for known vulnerabilities
+      shell: bash
+      run: |
+        ~/.platformio/penv/bin/python -m pip install -q pip-audit
+        if ! ~/.platformio/penv/bin/pip-audit -l --progress-spinner off; then
+          echo "::warning::A build tool has a known vulnerability (see the list above). Update requirements-build.txt."
+        fi
 
     # The highlights the panel shows once after updating, from the pending release notes.
     - name: What's new
