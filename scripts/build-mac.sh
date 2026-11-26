@@ -100,6 +100,8 @@ if [[ "$have" != "$want" ]]; then
   "$PENV/bin/python" -m pip uninstall -y -q platformio 2>/dev/null || true   # stock core, if an older install left it
   "$PENV/bin/python" -m pip install -q --force-reinstall "$PIO_PKG"
 fi
+# starlette newer than pioarduino asks for: security fixes, used only by `pio home` (requirements-build-overrides.txt)
+"$PENV/bin/python" -m pip install -q --upgrade "starlette>=1.3.1" >/dev/null 2>&1 || true
 PIO="$PENV/bin/pio"
 ok "$("$PIO" --version)"
 

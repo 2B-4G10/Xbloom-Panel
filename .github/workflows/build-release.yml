@@ -15,6 +15,7 @@ on:
       - "platformio.ini"
       - "partitions.csv"
       - "requirements-build.txt"
+      - "requirements-build-overrides.txt"
       - ".github/**"
   schedule:
     - cron: "17 18 * * 3"   # weekly: Wednesday 18:17 UTC (21:17 Riyadh), after the week's updates

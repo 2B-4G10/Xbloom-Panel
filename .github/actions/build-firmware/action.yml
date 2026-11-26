@@ -26,7 +26,7 @@ runs:
       uses: actions/cache@v6
       with:
         path: ~/.platformio
-        key: pio-v2-${{ runner.os }}-py312-${{ hashFiles('platformio.ini', 'requirements-build.txt') }}
+        key: pio-v2-${{ runner.os }}-py312-${{ hashFiles('platformio.ini', 'requirements-build.txt', 'requirements-build-overrides.txt') }}
         restore-keys: pio-v2-${{ runner.os }}-py312-
 
     # The ESP32 platform runs a nested build with the PlatformIO Core in ~/.platformio/penv
@@ -40,6 +40,9 @@ runs:
         ~/.platformio/penv/bin/python -m pip uninstall -y -q platformio || true
         # --upgrade: a cached environment still gets the newest allowed versions (security fixes).
         ~/.platformio/penv/bin/python -m pip install -q --upgrade --upgrade-strategy eager -r requirements-build.txt
+        # Security fixes pioarduino's own pins hold back (see that file). pip notes the
+        # version conflict; it is expected.
+        ~/.platformio/penv/bin/python -m pip install -q --upgrade -r requirements-build-overrides.txt 2>&1 | grep -v "dependency conflicts\|requires starlette\|resolver does not currently" || true
         ~/.platformio/penv/bin/pio --version
 
     # Known vulnerabilities in the build tools (they run on the build machine, not on the panel).
@@ -48,7 +51,7 @@ runs:
       run: |
         ~/.platformio/penv/bin/python -m pip install -q pip-audit
         if ! ~/.platformio/penv/bin/pip-audit -l --progress-spinner off; then
-          echo "::warning::A build tool has a known vulnerability (see the list above). Update requirements-build.txt."
+          echo "::warning::A build tool has a known vulnerability (see the list above). Update requirements-build.txt or requirements-build-overrides.txt."
         fi
 
     # The highlights the panel shows once after updating, from the pending release notes.
