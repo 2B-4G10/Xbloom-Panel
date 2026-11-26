@@ -50,7 +50,9 @@ runs:
       shell: bash
       run: |
         ~/.platformio/penv/bin/python -m pip install -q pip-audit
-        if ! ~/.platformio/penv/bin/pip-audit -l --progress-spinner off; then
+        # PYSEC-2026-1325 (ecdsa, no fixed version): a timing attack on signing with a
+        # private key. The build never signs with ecdsa, so it doesn't apply here.
+        if ! ~/.platformio/penv/bin/pip-audit -l --progress-spinner off --ignore-vuln PYSEC-2026-1325; then
           echo "::warning::A build tool has a known vulnerability (see the list above). Update requirements-build.txt or requirements-build-overrides.txt."
         fi
 
