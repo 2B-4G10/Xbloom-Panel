@@ -1,0 +1,89 @@
+name: Storage cleanup
+
+# Keeps Actions storage small (artifacts of private repositories count against the account's
+# 2 GB, billed by the hour). Every night it deletes:
+#   - artifacts older than KEEP_DAYS, except the newest KEEP_LATEST of each kind (the name
+#     without versions, numbers and commit hashes) from the default branch and from other
+#     branches, and names matching PROTECT (R8 mappings);
+#   - caches of pull requests that are closed (nothing can restore them again);
+#   - caches superseded by a newer one with the same key on the same branch, unused for a day
+#     (restore-keys always pick the newest; old ones only crowd out live caches at 10 GB).
+#     setup-gradle's shared entries (dependencies, transforms, ...) are left to setup-gradle:
+#     an old one can still be in use; only its per-job gradle-home entries are pruned.
+# Nothing here reads artifacts of earlier runs except by hand, so the latest builds stay
+# downloadable. Run it by hand with dry_run to see what would go.
+on:
+  schedule:
+    - cron: '43 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only list what would be deleted
+        type: boolean
+        default: true
+
+permissions:
+  actions: write
+  pull-requests: read
+
+concurrency:
+  group: storage-cleanup
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      MAIN: ${{ github.event.repository.default_branch }}
+      KEEP_DAYS: 3
+      KEEP_LATEST: 2
+      PROTECT: mapping
+      DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+    steps:
+      - name: Delete old artifacts and dead caches
+        run: |
+          set -euo pipefail
+          now=$(date +%s)
+          del() { # kind, id, label, bytes
+            if [ "$DRY_RUN" = 1 ]; then echo "would delete $3"
+            else gh api -X DELETE "repos/$REPO/actions/$1/$2" >/dev/null || return 1; fi
+            count=$((count + 1)); bytes=$((bytes + $4))
+          }
+          report() { echo "- $1: $count, $((bytes / 1048576)) MB" | tee -a "$GITHUB_STEP_SUMMARY"; count=0; bytes=0; }
+          count=0; bytes=0
+          [ "$DRY_RUN" = 1 ] && echo "**Dry run**: nothing was deleted." >> "$GITHUB_STEP_SUMMARY"
+
+          while IFS=$'\t' read -r id name size _ branch; do
+            del artifacts "$id" "artifact $name ($branch)" "$size" || true
+          done < <(gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
+              --jq '.artifacts[] | select(.expired | not)
+                    | [.id, .name, .size_in_bytes, (.created_at | fromdate), (.workflow_run.head_branch // "")] | @tsv' |
+            sort -t$'\t' -k4,4nr |
+            awk -F'\t' -v cutoff=$((now - KEEP_DAYS * 86400)) -v keep="$KEEP_LATEST" -v protect="$PROTECT" -v main="$MAIN" '
+              { kind = $2; gsub(/[0-9a-f]{7,40}$/, "", kind); gsub(/[0-9]+/, "#", kind)
+                kind = kind ($5 == main ? " main" : " other")
+                if (++seen[kind] > keep && $4 < cutoff && $2 !~ protect) print }')
+          report "Artifacts deleted"
+
+          caches=$(gh api --paginate "repos/$REPO/actions/caches?per_page=100" \
+            --jq '.actions_caches[] | [.id, .key, .size_in_bytes, (.created_at | sub("\\.[0-9]+"; "") | fromdate),
+                  (.last_accessed_at | sub("\\.[0-9]+"; "") | fromdate), .ref] | @tsv')
+
+          open=" $(gh pr list -R "$REPO" --state open --limit 500 --json number --jq '.[].number' | tr '\n' ' ') "
+          while IFS=$'\t' read -r id key size _ _ ref; do
+            pr=${ref#refs/pull/}; pr=${pr%%/*}
+            case "$open" in *" $pr "*) continue ;; esac
+            del caches "$id" "cache of closed #$pr: $key" "$size" || true
+          done < <(awk -F'\t' '$6 ~ /^refs\/pull\//' <<< "$caches")
+          report "Caches of closed pull requests deleted"
+
+          while IFS=$'\t' read -r id key size _ _ _; do
+            del caches "$id" "superseded cache $key" "$size" || true
+          done < <(sort -t$'\t' -k4,4nr <<< "$caches" |
+            awk -F'\t' -v old=$((now - 86400)) '
+              $2 ~ /^gradle-/ && $2 !~ /^gradle-home-/ { next }
+              $6 !~ /^refs\/pull\// { group = $6 " " $2; gsub(/[0-9a-f]{16,}/, "H", group)
+                if (seen[group]++ && $5 < old) print }')
+          report "Superseded caches deleted"
