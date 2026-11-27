@@ -1,7 +1,7 @@
 name: Storage cleanup
 
 # Keeps Actions storage small (artifacts of private repositories count against the account's
-# 2 GB, billed by the hour). Every night it deletes:
+# 2 GB, billed by the hour). Every other day it deletes:
 #   - artifacts older than KEEP_DAYS, except the newest KEEP_LATEST of each kind (the name
 #     without versions, numbers and commit hashes) from the default branch and from other
 #     branches, and names matching PROTECT (R8 mappings);
@@ -14,7 +14,7 @@ name: Storage cleanup
 # downloadable. Run it by hand with dry_run to see what would go.
 on:
   schedule:
-    - cron: '43 2 * * *'
+    - cron: '43 2 */2 * *' # every other day (odd days of the month), 02:43 UTC
   workflow_dispatch:
     inputs:
       dry_run:
