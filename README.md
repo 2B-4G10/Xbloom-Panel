@@ -1,3 +1,7 @@
+<p align="center">
+  <a href="README.ar.md">العربية</a> · <b>English</b> · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
 <div align="center">
 
 <img alt="By: Double Shot — Speciality Coffee / Bareista Tools" src="docs/images/logo.png" width="520">
